@@ -89,7 +89,18 @@ auth -X PATCH "$API" -d '{"private":false}' | grep -q '"private": false' \
 echo "repo is public"
 
 if [ "$(auth -o /dev/null -w '%{http_code}' "$API/pages")" = "404" ]; then
-  auth -X POST "$API/pages" -d '{"source":{"branch":"main","path":"/"}}' >/dev/null
+  # a 404 here means Pages is off; the POST must be verified or the publish looks
+  # successful while the link stays dead (the API also 404s for a few seconds
+  # after the repo is created, so retry before giving up)
+  OK=0
+  for attempt in 1 2 3 4 5; do
+    CODE=$(auth -o /dev/null -w '%{http_code}' -X POST "$API/pages" -d '{"source":{"branch":"main","path":"/"}}')
+    case "$CODE" in
+      201|409) OK=1; break ;;
+      *) echo "  pages POST -> HTTP $CODE, retrying"; sleep 6 ;;
+    esac
+  done
+  [ "$OK" = "1" ] || { echo "PAGES DID NOT ENABLE — the link will 404 until it does"; exit 1; }
   echo "pages enabled"
 else
   echo "pages already enabled"

@@ -14,6 +14,12 @@ questions about a Singapore BTO purchase:
 Open it by double-clicking `index.html`. No build step, no dependencies, no
 network calls. Inputs persist in `localStorage`.
 
+**Live link:** https://lurkeyteg.github.io/bto-studio/ — public repo
+`Lurkeyteg/bto-studio`, GitHub Pages. The source is readable by anyone with the
+link (true of any static host); `Raw/Code/bto-calculator/` in the vault stays the
+source of truth and `~/code/bto-studio/publish.sh` republishes it (`retract`
+takes the link down).
+
 Files:
 
 | File | What it is |
