@@ -1,0 +1,155 @@
+# BTO Studio — payment, loan & savings planner
+
+Single-file web app (`index.html`) for sitting with a client and answering four
+questions about a Singapore BTO purchase:
+
+1. **What do I pay, and when?** — every stage from application to key collection,
+   split between CPF OA and cash.
+2. **What is the monthly instalment, and how much of it is CPF vs cash?**
+3. **How much must I save each month while the flat is being built** (build time
+   is an input — 3 years by default).
+4. **How much is left for my other investment goals** — as a couple (50/50, by
+   income, or any custom split) or buying alone.
+
+Open it by double-clicking `index.html`. No build step, no dependencies, no
+network calls. Inputs persist in `localStorage`.
+
+Files:
+
+| File | What it is |
+|---|---|
+| `index.html` | The whole app: engine (marked `BTO ENGINE START/END`), UI, styles |
+| `tests/engine.test.mjs` | 88 assertions run against the engine **extracted from `index.html`** |
+| `README.md` | This file |
+
+Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
+**88 passed, 0 failed**.
+
+## Sources
+
+- **Video** — Xavier Tan, *BTO payment timeline* (youtube.com/watch?v=Fzlne3ZEkGk).
+  Supplies the four payment stages and the three financing routes, including the
+  worked examples used as test fixtures: 4-room $550,000 couple and 2-room
+  $250,000 single.
+- **Spreadsheet** — "BTO Cacl By XAV" (Google Sheet, id `1W-R8N_...gk9k`),
+  tabs `2025-2026`, `IncomeCPF Contribution`, `22.5% DP`,
+  `Calculation for DPSavings`, `Loan Repayment Amount`, `BTO Key Collection`.
+  Supplies the fee scale, EHG table, CPF/OA allocation table, salary ceilings,
+  HPS and fire-insurance figures, and the key-collection checklist.
+- **HDB / CPF published rules** for BSD bands, conveyancing scale, downpayment
+  structure, MSR/TDSR and the staggered downpayment scheme's eligibility.
+
+## Rules as implemented
+
+**Stages**
+
+| Stage | When | What falls due |
+|---|---|---|
+| 1 Application | at launch | $10, cash |
+| 2 Booking | unit selection | option fee $500 (2-room) / $1,000 (3-room) / $2,000 (4-room+), cash, credited to the downpayment |
+| 3 Agreement for lease | ~8 months (input) | downpayment share less option fee, buyer stamp duty, legal fee |
+| 4 Key collection | ~36 months (input) | remaining downpayment, survey, lease + mortgage in-escrow fees, stamp duty on deed of assignment, HPS, fire insurance (+ optional town-council advance) |
+
+**Financing routes** (total downpayment / due at signing / mandatory cash)
+
+| Route | Total DP | At signing | Mandatory cash |
+|---|---|---|---|
+| HDB loan | 25% | 10% less option fee | none — all CPF-eligible |
+| HDB staggered | 25% | 5% less option fee | none |
+| Bank loan 75% LTV | 25% | 20% less option fee | 5% of price |
+| Bank loan 55% LTV | 45% | 45% less option fee | 10% of price |
+
+**Fees**
+
+- Buyer stamp duty — 1% first $180k, 2% next $180k, 3% next $640k, 4% next
+  $500k, 5% above $1.5m, computed on the price **before** the grant.
+- Legal / conveyancing — 0.09% per $100 on the first $30k, 0.072% on the next
+  $30k, 0.06% thereafter, rounded up to the dollar, × 1.09 GST.
+- Survey — $150 / $212.50 / $275 / $325 by flat type, × GST.
+- Lease in-escrow $38.30; mortgage in-escrow $38.30 (HDB loans only).
+- Stamp duty on deed of assignment — 0.4% of the loan, capped at $500.
+- HPS $185 (input — real premium varies by loan, age and tenure).
+- Fire insurance — $1.99 / $3.27 / $4.59 / $5.43 by flat type.
+
+**CPF**
+
+- Employee 20 / employer 17% below 55, then 18/16, 12.5/12.5, 7.5/9, 5/7.5 by
+  age band; salary ceiling $8,000/month (2026).
+- OA share of total contribution 62.17% below 35, then 56.77 / 51.36 / 40.55 /
+  35.3 / 14 / 6.07 / 8%.
+- OA grows at 2.5% a year with monthly contributions compounded to each stage.
+- **CPF pays first, cash covers the rest**, but never more than the mandatory
+  cash floor of the chosen route. Any CPF shortfall can be pooled from the
+  partner's OA; whatever is still uncovered becomes cash.
+
+**Loan**
+
+- Instalment = `PMT(rate/12, tenure×12, loan)`; the loan is the price after
+  grant less the downpayment.
+- Cash top-up = max(0, instalment − monthly OA inflow); the page also shows how
+  many months the leftover OA at key collection can absorb a shortfall.
+- Stress test adds a configurable rate (default +1%) and shows the resulting
+  instalment and cash top-up.
+- MSR check: instalment ÷ gross household income, flagged over 30%.
+
+**Save-up plan**
+
+Required level monthly saving `S` solves both deadlines at once — the signing
+lump `X3` at month `m3` and the key-collection lump `X4` at month `m4`:
+
+```
+F(n)   = ((1+r)^n − 1) / r           (r = savings rate / 12)
+S      = max( (X4 + X3·(1+r)^(m4−m3)) / F(m4),  X3 / F(m3) )
+```
+
+i.e. the larger of "fund the whole bill by key collection" and "fund the
+signing lump in time". Because the signing lump is often the tighter deadline,
+the plan usually lands **ahead** of the total by key collection — the app calls
+that out as renovation money rather than hiding it, and gives the lower
+**two-speed** rate you can drop to once the lease is signed:
+
+```
+S2 = ( X4 − (S·F(m3) − X3)·(1+r)^(m4−m3) ) / F(m4−m3)
+```
+
+Wiggle room = monthly cash available (take-home pay less other commitments)
+minus that saving requirement. The surplus is what stays free for other goals,
+and is projected forward at the investment rate to key collection.
+
+## Assumptions and things to watch
+
+- Prices, grants and rates are **inputs**, not published figures — update them
+  at every client meeting.
+- The grant reduces the purchase price for the downpayment and the loan (as the
+  reference sheet does). HDB actually credits the grant into CPF OA; the net
+  effect on cash needed is the same, the CPF ledger is simplified.
+- EHG is auto-filled from household income at couple rates, halved in single
+  mode. Other grants (e.g. PHG, family grants) go in "Other grants".
+- Singles: the app disables nothing, but the Single/Couple tab states the real
+  constraints — 2-room Flexi route, no staggered downpayment, half-rate grant.
+- Not modelled: ABSD (not payable on a first BTO), resale levy, renovation,
+  furniture, town council charges beyond the input, HDB's actual HPS pricing,
+  income changes during the build, CPF interest on balances above $20k tiers.
+- CPF rates above age 55 are the sheet's figures; verify against CPF Board
+  before relying on them for older buyers.
+- The sheet's `22.5% DP` tab splits the HDB downpayment 2.5% / 22.5%. The video
+  and HDB's published rules use **10% at signing and 15% at key collection**
+  (or 5% / 20% staggered), which is what this app models. `Calculation for
+  DPSavings` in the same workbook agrees with 5% / 20%.
+
+## Deviation log
+
+- Per-person CPF allocation was initially capped by opening OA only, which
+  understated CPF earned during construction — fixed (tests 9).
+- Mandatory cash minimums (bank loans) were not enforced against CPF-first
+  allocation — fixed (tests 4 and 5).
+- The save-up chart dropped the key-collection step — fixed.
+
+## Next steps if this earns a v2
+
+- Compare two flats side by side, and a "cheaper flat" what-if that recomputes
+  the same plan at −$50k.
+- HPS premium lookup from a published table instead of a single figure.
+- Export the client summary as a PDF with the firm's letterhead (print styles
+  already hide the inputs).
+- Resale / Sale-of-Balance variant with resale levy, ABSD and a shorter timeline.

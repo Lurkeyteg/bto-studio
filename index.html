@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BTO Studio — Payment, Loan &amp; Savings Planner</title>
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="description" content="Singapore BTO planner: staged CPF/cash payments, HDB or bank loan repayment split between CPF and cash, save-up plan to key collection, single vs couple splitting.">
+<meta name="theme-color" content="#0e1311">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e1311'/%3E%3Cpath d='M6 15 L16 7 L26 15' fill='none' stroke='%236fbfa5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M9 15 V25 H23 V15' fill='none' stroke='%2395d9c3' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#0e1311;--panel:#151d1a;--panel2:#1b2420;--line:#27342e;--txt:#e6efe9;--muted:#8a9c93;
+  --accent:#6fbfa5;--accent2:#95d9c3;--onaccent:#0b1210;--up:#16c784;--down:#ea3943;
+  --gold:#ffd34d;--chip:#202b26;--hover:#1f2a25;--cpf:#7fa8c2;--cash:#e2b268;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+  --r:14px;--rs:9px;color-scheme:dark;
+  --glow:radial-gradient(900px 420px at 12% -12%,rgba(111,191,165,.14),transparent 62%),radial-gradient(700px 380px at 94% 0%,rgba(226,178,104,.07),transparent 60%);
+}
+:root[data-theme="light"]{
+  --bg:#f3f7f5;--panel:#ffffff;--panel2:#eef4f1;--line:#d9e3de;--txt:#132019;--muted:#5b6b63;
+  --accent:#2f7d63;--accent2:#25674f;--onaccent:#fff;--up:#0e9f6e;--down:#d62839;--gold:#a8720a;
+  --chip:#eef4f1;--hover:#eef4f1;--cpf:#3e6076;--cash:#a8720a;color-scheme:light;
+  --glow:radial-gradient(900px 420px at 12% -12%,rgba(47,125,99,.10),transparent 62%),radial-gradient(700px 380px at 94% 0%,rgba(168,114,10,.06),transparent 60%);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);background-image:var(--glow);background-repeat:no-repeat;color:var(--txt);
+  font-family:var(--font);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:40px}
+.wrap{max-width:1320px;margin:0 auto;padding:0 22px}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.top{position:sticky;top:0;z-index:60;display:flex;align-items:center;gap:9px;padding:12px 22px;
+  border-bottom:1px solid var(--line);background:color-mix(in srgb,var(--bg) 84%,transparent);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);flex-wrap:nowrap}
+.brand{display:flex;align-items:baseline;gap:9px;white-space:nowrap}
+.brand b{font-size:15px;font-weight:750;letter-spacing:-.2px}
+.brand span{font-size:11.5px;color:var(--muted)}
+.sp{flex:1}
+.tbtn{background:var(--panel);border:1px solid var(--line);color:var(--muted);border-radius:8px;
+  padding:7px 11px;font-size:12.5px;line-height:1;cursor:pointer;font-family:inherit;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:6px;transition:.14s}
+.tbtn:hover{color:var(--txt);border-color:var(--accent)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:4px 9px;border-radius:999px;
+  border:1px solid var(--line);background:var(--chip);color:var(--muted);white-space:nowrap}
+.pill.ok{color:var(--up);border-color:color-mix(in srgb,var(--up) 35%,var(--line))}
+.pill.warn{color:#ffb3bf;border-color:#46232b;background:#241a1d}
+:root[data-theme="light"] .pill.warn{background:#fdeef0;border-color:#f3c6cc;color:#8a1f2a}
+.hero{padding:28px 0 14px}
+.hero h1{margin:0 0 8px;font-size:clamp(23px,3vw,34px);line-height:1.14;letter-spacing:-1px;font-weight:760}
+.hero h1 em{font-style:normal;color:var(--accent2)}
+.hero p{margin:0;max-width:780px;color:var(--muted);font-size:13.5px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:14px 0 16px;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;border-bottom:2px solid transparent;color:var(--muted);font-family:inherit;
+  font-size:13px;font-weight:650;padding:9px 11px 10px;cursor:pointer;white-space:nowrap;letter-spacing:-.1px}
+.tab:hover{color:var(--txt)}
+.tab.on{color:var(--accent2);border-bottom-color:var(--accent)}
+.grid{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
+.grid > *{min-width:0}
+@media(max-width:980px){.grid{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;overflow-x:auto}
+.card + .card{margin-top:14px}
+.ctitle{font-size:10.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 12px}
+.side{position:sticky;top:68px;max-height:calc(100vh - 82px);overflow:auto;padding-right:4px}
+.side::-webkit-scrollbar{width:8px}
+.side::-webkit-scrollbar-thumb{background:var(--line);border-radius:8px}
+@media(max-width:980px){.side{position:static;max-height:none;overflow:visible}}
+details.grp{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);margin-bottom:10px;overflow:hidden}
+details.grp>summary{cursor:pointer;list-style:none;padding:11px 14px;font-size:11px;letter-spacing:1.2px;
+  text-transform:uppercase;font-weight:750;color:var(--muted);display:flex;align-items:center;justify-content:space-between}
+details.grp>summary::-webkit-details-marker{display:none}
+details.grp>summary::after{content:"+";font-size:15px;color:var(--accent);font-weight:700;line-height:1}
+details.grp[open]>summary::after{content:"–"}
+details.grp>summary:hover{color:var(--txt)}
+details.grp .body{padding:2px 14px 14px}
+.field{margin-bottom:12px}
+.field:last-child{margin-bottom:0}
+.field label{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--muted);margin-bottom:5px;gap:8px}
+.field label b{color:var(--txt);font-weight:650}
+.inp{display:flex;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:var(--rs);overflow:hidden;transition:.14s}
+.inp:focus-within{border-color:var(--accent)}
+.inp .pfx{padding:0 0 0 10px;color:var(--muted);font-size:12px}
+.inp input{flex:1;min-width:0;background:none;border:0;color:var(--txt);font-family:inherit;font-size:13.5px;
+  padding:8px 10px;font-variant-numeric:tabular-nums;outline:none;width:100%}
+.inp .sfx{padding:0 10px 0 0;color:var(--muted);font-size:11.5px;white-space:nowrap}
+select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:var(--rs);color:var(--txt);
+  font-family:inherit;font-size:13px;padding:8px 9px;outline:none;cursor:pointer}
+select:focus{border-color:var(--accent)}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:var(--rs);padding:3px;gap:3px;flex-wrap:wrap}
+.seg button{flex:1;background:none;border:0;color:var(--muted);font-family:inherit;font-size:11.5px;font-weight:650;
+  padding:6px 4px;border-radius:6px;cursor:pointer;white-space:nowrap}
+.seg button:hover{color:var(--txt)}
+.seg button.on{background:var(--accent);color:var(--onaccent)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(164px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px}
+.kpi .k{font-size:10.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:700}
+.kpi .v{font-size:21px;font-weight:730;letter-spacing:-.8px;margin-top:5px}
+.kpi .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.kpi.hi{border-color:color-mix(in srgb,var(--accent) 45%,var(--line));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--accent) 10%,var(--panel)),var(--panel))}
+.up{color:var(--up)}.down{color:var(--down)}.gold{color:var(--gold)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:right;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+  font-weight:700;padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:7px 9px;border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent);text-align:right;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.sect td{background:color-mix(in srgb,var(--panel2) 75%,transparent);font-weight:750;font-size:11px;
+  letter-spacing:.5px;text-transform:uppercase;color:var(--accent2);border-bottom:1px solid var(--line);padding:8px 9px}
+tr.tot td{font-weight:750;border-top:1px solid var(--line);border-bottom:0;background:color-mix(in srgb,var(--panel2) 45%,transparent)}
+td.note{color:var(--muted);font-size:11.5px;white-space:normal;text-align:left;font-variant-numeric:normal}
+.badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.4px;padding:1px 6px;border-radius:5px;border:1px solid}
+.badge.cpf{color:var(--cpf);border-color:color-mix(in srgb,var(--cpf) 45%,transparent);background:color-mix(in srgb,var(--cpf) 12%,transparent)}
+.badge.cash{color:var(--cash);border-color:color-mix(in srgb,var(--cash) 45%,transparent);background:color-mix(in srgb,var(--cash) 12%,transparent)}
+.bar{display:grid;grid-template-columns:158px 1fr 92px;gap:10px;align-items:center;margin-bottom:9px;font-size:12px}
+.bar .t{color:var(--muted);font-size:11.5px;line-height:1.3}
+.bar .track{display:flex;height:20px;border-radius:6px;overflow:hidden;background:var(--panel2);border:1px solid var(--line)}
+.bar .seg1{background:var(--cpf);height:100%}
+.bar .seg2{background:var(--cash);height:100%}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums;font-weight:650}
+@media(max-width:720px){.bar{grid-template-columns:100px 1fr 82px;font-size:11px}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin:2px 0 12px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px}
+.msg{border:1px solid var(--line);border-radius:var(--rs);padding:9px 11px;font-size:12.5px;color:var(--muted);background:var(--panel2);margin-top:10px}
+.msg.ok{border-color:color-mix(in srgb,var(--up) 40%,var(--line));color:var(--up)}
+.msg.warn{border-color:#46232b;color:#ffb3bf;background:#241a1d}
+:root[data-theme="light"] .msg.warn{background:#fdeef0;border-color:#f3c6cc;color:#8a1f2a}
+.msg b{color:var(--txt)}
+:root[data-theme="light"] .msg.warn b{color:inherit}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:860px){.grid2{grid-template-columns:1fr}}
+.mini{font-size:11.5px;color:var(--muted)}
+.mini b{color:var(--txt)}
+h3.h{font-size:13px;font-weight:700;margin:0 0 10px;letter-spacing:-.2px}
+ul.clean{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--muted)}
+ul.clean li{margin-bottom:5px}
+ul.clean b{color:var(--txt)}
+.chk{display:flex;gap:9px;align-items:flex-start;padding:6px 0;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent);font-size:12.5px}
+.chk input{margin-top:3px;accent-color:var(--accent);flex:0 0 auto}
+.chk .n{color:var(--muted);font-size:11.5px;margin-top:2px}
+.foot{margin-top:26px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);line-height:1.7}
+.svgwrap{overflow-x:auto}
+@media(max-width:720px){
+  .top{padding:10px 14px;gap:6px}
+  .brand b{font-size:14px}
+  .brand span{display:none}
+  .tbtn{padding:6px 8px;font-size:12px}
+  .tbtn span{display:none}
+  .pill{font-size:10px;padding:3px 7px}
+  .wrap{padding:0 14px}
+  .hero{padding:22px 0 10px}
+  .hero h1{font-size:26px}
+  .tab{font-size:12px;padding:8px 8px 9px}
+  .kpi .v{font-size:19px}
+  h3.h{font-size:12.5px}
+}
+@media print{
+  .top,.tabs,.side,.hero p,.foot{display:none!important}
+  body{background:#fff;color:#111;padding:0}
+  .grid{display:block}
+  .card{break-inside:avoid}
+  .kpi{background:#fff}
+  a{color:#111;text-decoration:none}
+}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="brand"><b>BTO Studio</b><span>payment · loan · savings planner</span></div>
+  <div class="sp"></div>
+  <span class="pill" id="pillMode">Couple</span>
+  <span class="pill" id="pillLoan">HDB loan</span>
+  <button class="tbtn" id="printBtn">⎙ Print</button>
+  <button class="tbtn" id="resetBtn">Reset</button>
+  <button class="tbtn" id="themeBtn">◐ <span>Theme</span></button>
+</div>
+
+<div class="wrap">
+  <div class="hero">
+    <h1>What your BTO really costs — <em>in CPF, in cash, and per month</em></h1>
+    <p>Every stage from application to key collection, the monthly instalment split between CPF and cash, and how much you must set aside now while the flat is being built — as a couple or on your own.</p>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-tab="payments">Payments</button>
+    <button class="tab" data-tab="loan">Monthly loan</button>
+    <button class="tab" data-tab="saveup">Save-up plan</button>
+    <button class="tab" data-tab="split">Couple / single</button>
+    <button class="tab" data-tab="summary">Client summary</button>
+    <button class="tab" data-tab="checklist">Key collection</button>
+  </div>
+
+  <div class="grid">
+    <aside class="side" id="side"></aside>
+    <main id="view"></main>
+  </div>
+
+  <div class="foot">
+    Estimates only, built on published HDB / CPF rules for 2025–2026. EHG, HPS, fire insurance and bank rates vary case by case — every figure is an editable input. A planning tool for client conversations, not a loan offer or a CPF statement.
+  </div>
+</div>
+
+<script>
+/* ==== BTO ENGINE START ==== */
+var BTO = (function () {
+'use strict';
+
+var OPTION_FEE = {'2-room':500,'3-room':1000,'4-room':2000,'5-room':2000};
+var SURVEY_PRE_GST = {'2-room':150,'3-room':212.5,'4-room':275,'5-room':325};
+var FIRE = {'2-room':1.99,'3-room':3.27,'4-room':4.59,'5-room':5.43};
+var LEASE_REG = 38.30, MORT_REG = 38.30;
+
+/* Enhanced CPF Housing Grant — couple rates by average gross monthly household income */
+var EHG_TIERS = [[1500,120000],[2000,110000],[2500,105000],[3000,95000],[3500,90000],[4000,80000],
+  [4500,70000],[5000,65000],[5500,55000],[6000,50000],[6500,40000],[7000,30000],
+  [7500,25000],[8000,20000],[8500,10000],[9000,5000]];
+
+/* CPF: [upper age bound, employee rate, employer rate] ; OA share of total contribution */
+var AGE_BANDS = [[55,0.20,0.17],[60,0.18,0.16],[65,0.125,0.125],[70,0.075,0.09],[999,0.05,0.075]];
+var OA_SHARE = [[35,0.6217],[45,0.5677],[50,0.5136],[55,0.4055],[60,0.353],[65,0.14],[70,0.0607],[999,0.08]];
+
+/* financing paths: total downpayment, share at agreement-for-lease, mandatory-cash share */
+var PATHS = {
+  'hdb':           {dp:0.25, sign:0.10, cashMin:0.00, rateKey:'rateHdb',  label:'HDB loan'},
+  'hdb-staggered': {dp:0.25, sign:0.05, cashMin:0.00, rateKey:'rateHdb',  label:'HDB loan (staggered)'},
+  'bank75':        {dp:0.25, sign:0.20, cashMin:0.05, rateKey:'rateBank', label:'Bank loan (75% LTV)'},
+  'bank55':        {dp:0.45, sign:0.45, cashMin:0.10, rateKey:'rateBank', label:'Bank loan (55% LTV)'}
+};
+
+function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
+function bandVal(bands, x, idx){
+  for (var i=0;i<bands.length;i++){ if (x <= bands[i][0]) return bands[i][idx]; }
+  return bands[bands.length-1][idx];
+}
+function pmt(rate, n, pv){
+  if (n <= 0) return 0;
+  if (!rate) return pv / n;
+  return pv * rate / (1 - Math.pow(1 + rate, -n));
+}
+function fvFactor(rate, n){            /* future value of $1/month for n months, end of month */
+  if (n <= 0) return 0;
+  if (!rate) return n;
+  return (Math.pow(1 + rate, n) - 1) / rate;
+}
+function grow(pv, rate, n){ return pv * Math.pow(1 + rate, n); }
+
+function optionFee(flatType){ return OPTION_FEE[flatType] || 2000; }
+function surveyFee(flatType, gst){ return round2((SURVEY_PRE_GST[flatType] || 275) * gst); }
+function firePremium(flatType){ return FIRE[flatType] || 5.43; }
+
+function ehgGrant(income, single){
+  var g = 0;
+  for (var i=0;i<EHG_TIERS.length;i++){
+    if (income <= EHG_TIERS[i][0]) { g = EHG_TIERS[i][1]; break; }
+  }
+  return single ? Math.round(g / 2) : g;
+}
+/* Buyer stamp duty — progressive on the stated purchase price (before grant) */
+function bsd(price){
+  var bands = [[180000,0.01],[180000,0.02],[640000,0.03],[500000,0.04],[Infinity,0.05]];
+  var left = price, tax = 0;
+  for (var i=0;i<bands.length && left>0;i++){
+    var amt = Math.min(left, bands[i][0]);
+    tax += amt * bands[i][1];
+    left -= amt;
+  }
+  return round2(tax);
+}
+/* HDB conveyancing: 0.09% / 0.072% / 0.06% per $100 band, rounded up to $1, plus GST */
+function legalFee(price, gst){
+  var f;
+  if (price <= 30000) f = price * 0.0009;
+  else if (price <= 60000) f = 30000 * 0.0009 + (price - 30000) * 0.00072;
+  else f = 30000 * 0.0009 + 30000 * 0.00072 + (price - 60000) * 0.0006;
+  return round2(Math.ceil(f) * gst);
+}
+function cpfRates(age){
+  return { emp: bandVal(AGE_BANDS, age, 1), empr: bandVal(AGE_BANDS, age, 2), oa: bandVal(OA_SHARE, age, 1) };
+}
+function monthlyOA(p, s){
+  var r = cpfRates(p.age || 30);
+  var income = p.income || 0;
+  if (p.basis === 'self'){
+    var annual = Math.min(income * 12, s.seCapAnnual || 102000);
+    return (annual / 12) * 0.295 * r.oa;              /* Medisave 8% + voluntary 29.5%, OA share applied */
+  }
+  var w = Math.min(income, s.salaryCeiling || 8000);
+  return (w * r.emp + w * r.empr) * r.oa;
+}
+function monthlyTakeHome(p, s){
+  var income = p.income || 0;
+  if (p.basis === 'self'){
+    var annual = Math.min(income * 12, s.seCapAnnual || 102000);
+    return income - (annual / 12) * 0.08;
+  }
+  var w = Math.min(income, s.salaryCeiling || 8000);
+  return income - w * cpfRates(p.age || 30).emp;
+}
+function ratiosFor(s, people){
+  if (s.mode === 'single' || people.length < 2) return [1];
+  if (s.splitMode === 'income'){
+    var t = people.reduce(function(a,p){ return a + (p.income||0); }, 0) || 1;
+    return people.map(function(p){ return (p.income||0) / t; });
+  }
+  if (s.splitMode === 'custom'){
+    var a = Math.min(100, Math.max(0, s.splitA)) / 100;
+    return [a, 1 - a];
+  }
+  return [0.5, 0.5];
+}
+
+/* ---------- core model (no path comparison, so it stays non-recursive) ---------- */
+function computeCore(s){
+  var single = s.mode === 'single';
+  var people = single ? [s.people[0]] : [s.people[0], s.people[1]];
+  var path = PATHS[s.loanType] || PATHS.hdb;
+  var gross = s.price || 0;
+  var incomeTotal = people.reduce(function(a,p){ return a + (p.income||0); }, 0);
+
+  var ehgAuto = ehgGrant(incomeTotal, single);
+  var grant = (s.grantMode === 'manual') ? (s.grantManual || 0) : (ehgAuto + (s.otherGrant || 0));
+  grant = Math.max(0, Math.min(grant, gross));
+  var net = Math.max(0, gross - grant);
+
+  var of = optionFee(s.flatType);
+  var dpTotal = net * path.dp;
+  var dp3 = Math.max(0, net * path.sign - of);
+  var dp4 = Math.max(0, dpTotal - net * path.sign);
+  var bsdAmt = bsd(gross);
+  var legal = legalFee(gross, s.gst || 1.09);
+  var svy = surveyFee(s.flatType, s.gst || 1.09);
+  var fire = (s.fireOverride === null || s.fireOverride === undefined || isNaN(s.fireOverride))
+    ? firePremium(s.flatType) : s.fireOverride;
+  var loanAmt = Math.max(0, net - dpTotal);
+  var aod = Math.min(loanAmt * 0.004, 500);
+  var isHdb = (s.loanType === 'hdb' || s.loanType === 'hdb-staggered');
+  var mortReg = isHdb ? MORT_REG : 0;
+  var cashMin3 = Math.max(0, net * path.cashMin - of);
+
+  var stages = [
+    { key:'s1', label:'1 · Application', when:'at launch', month:0,
+      items:[{n:'BTO application fee', a:10, p:'cash', note:'non-refundable, paid online'}], cashMin:0 },
+    { key:'s2', label:'2 · Flat booking', when:'at unit selection', month:Math.max(0, s.mBooking),
+      items:[{n:'Option fee', a:of, p:'cash', note:'NETS / cashier\u2019s order — credited to your downpayment'}], cashMin:0 },
+    { key:'s3', label:'3 · Agreement for lease', when:'~' + s.mSign + ' months out', month:Math.max(1, s.mSign),
+      items:[
+        {n:'Downpayment (' + Math.round(path.sign*100) + '% less option fee)', a:dp3, p:'either', note:'CPF OA, cash or grant'},
+        {n:'Buyer stamp duty', a:bsdAmt, p:'either', note:'computed on price before grant'},
+        {n:'Legal / conveyancing fee', a:legal, p:'either', note:'HDB scale, incl. GST'}
+      ], cashMin:cashMin3 },
+    { key:'s4', label:'4 · Key collection', when:'~' + s.mKey + ' months out', month:Math.max(2, s.mKey),
+      items:[
+        {n:'Downpayment balance (' + Math.round((dp4 / (net || 1)) * 100) + '% of price)', a:dp4, p:'either', note:''},
+        {n:'Survey fee', a:svy, p:'either', note:''},
+        {n:'Lease in-escrow registration', a:LEASE_REG, p:'either', note:'fixed'},
+        {n:'Mortgage in-escrow registration', a:mortReg, p:'either', note:isHdb ? 'HDB loan only' : 'not applicable'},
+        {n:'Stamp duty on Deed of Assignment', a:aod, p:'either', note:'0.4% of loan, capped $500'},
+        {n:'Home Protection Scheme (HPS)', a:s.hps || 0, p:'either', note:'varies by loan, age, tenure'},
+        {n:'Fire insurance (Etiqa)', a:fire, p:'cash', note:'annual premium'},
+        {n:'Advanced town council charges', a:s.townCouncil || 0, p:'cash', note:'optional, cash only'}
+      ], cashMin:0 }
+  ];
+
+  /* CPF OA projection and stage allocation */
+  var rOA = (s.oaRate || 0.025) / 12;
+  var oaPerPerson = people.map(function(p){ return { oa0: p.oa || 0, m: monthlyOA(p, s) }; });
+  function oaPerson(i, month){
+    var x = oaPerPerson[i];
+    return grow(x.oa0, rOA, month) + x.m * fvFactor(rOA, month);
+  }
+  function oaAvailable(month){
+    return people.reduce(function(a,_,i){ return a + oaPerson(i, month); }, 0);
+  }
+
+  var ratios = ratiosFor(s, people);
+  var consumed = people.map(function(){ return 0; });   /* CPF OA drawn per person, incl. pooling */
+  var cpfUsedTotal = 0;
+
+  stages.forEach(function(st){
+    st.total = st.items.reduce(function(a,i){ return a + i.a; }, 0);
+    st.cpfEligible = st.items.reduce(function(a,i){ return a + (i.p !== 'cash' ? i.a : 0); }, 0);
+    st.oaAvail = oaAvailable(st.month);
+    var pool = st.oaAvail - cpfUsedTotal;
+    /* CPF can never cover more than the eligible items less whatever must be cash */
+    st.cpfUsed = Math.max(0, Math.min(st.cpfEligible - (st.cashMin || 0), pool));
+    st.cash = Math.max(0, st.total - st.cpfUsed);
+
+    /* per-person: each pays their share from their own OA, a shortfall can be
+       met from the partner's spare OA, and whatever is still uncovered is cash */
+    var cap = people.map(function(_, i){ return Math.max(0, oaPerson(i, st.month) - consumed[i]); });
+    var want = ratios.map(function(r){ return r * st.cpfUsed; });
+    var burden = ratios.map(function(r){ return r * st.total; });
+    var cpfP = want.map(function(w, i){ return Math.min(w, cap[i]); });
+    var spare = cap.map(function(c, i){ return c - cpfP[i]; });
+    var received = people.map(function(){ return 0; });
+    var donated = people.map(function(){ return 0; });
+    want.forEach(function(w, i){
+      var short = w - cpfP[i];
+      if (short <= 0) return;
+      for (var j = 0; j < people.length && short > 0; j++){
+        if (j === i || spare[j] <= 0) continue;
+        var use = Math.min(short, spare[j]);
+        cpfP[i] += use; spare[j] -= use; short -= use;
+        received[i] += use; donated[j] += use;
+      }
+    });
+    cpfP = cpfP.map(function(c, i){ return Math.min(c, burden[i]); });
+    people.forEach(function(_, i){ consumed[i] += (cpfP[i] - received[i]) + donated[i]; });
+    st.byPerson = people.map(function(p, i){
+      return { name: p.name, cpf: cpfP[i], cash: burden[i] - cpfP[i] };
+    });
+    cpfUsedTotal += st.cpfUsed;
+  });
+
+  var totals = {
+    all: stages.reduce(function(a,st){ return a + st.total; }, 0),
+    cpf: stages.reduce(function(a,st){ return a + st.cpfUsed; }, 0),
+    cash: stages.reduce(function(a,st){ return a + st.cash; }, 0),
+    upfront: stages.slice(0,3).reduce(function(a,st){ return a + st.cash; }, 0),
+    atKey: stages[3].cash,
+    gross: gross, grant: grant, ehgAuto: ehgAuto, net: net, optionFee: of,
+    dpTotal: dpTotal, bsd: bsdAmt, legal: legal
+  };
+
+  var rate = s[path.rateKey] || 0.026;
+  var n = Math.max(1, Math.round((s.tenure || 25) * 12));
+  var inst = pmt(rate/12, n, loanAmt);
+  var instStress = pmt((rate + (s.stressAdd || 0.01))/12, n, loanAmt);
+  var oaInflow = oaPerPerson.reduce(function(a,x){ return a + x.m; }, 0);
+  var oaAtKey = Math.max(0, oaAvailable(stages[3].month) - cpfUsedTotal);
+  var cashTopUp = Math.max(0, inst - oaInflow);
+  var stressTopUp = Math.max(0, instStress - oaInflow);
+  var coveredMonths = (inst > oaInflow && oaAtKey > 0) ? oaAtKey / (inst - oaInflow) : Infinity;
+  var takeHome = people.reduce(function(a,p){ return a + monthlyTakeHome(p, s); }, 0);
+
+  var loan = {
+    amount: loanAmt, rate: rate, tenure: s.tenure || 25, n: n,
+    monthly: inst, stressMonthly: instStress, stressRate: rate + (s.stressAdd || 0.01),
+    cpfInflow: oaInflow, cashTopUp: cashTopUp, stressTopUp: stressTopUp,
+    oaAtKey: oaAtKey, coveredMonths: coveredMonths, takeHome: takeHome,
+    msr: incomeTotal ? inst / incomeTotal : 0,
+    totalInterest: inst * n - loanAmt, totalPaid: inst * n,
+    label: path.label, isHdb: isHdb
+  };
+
+  /* save-up plan to key collection */
+  var need3 = stages[2].cash;
+  var need4 = stages[3].cash;
+  var m3 = Math.max(1, stages[2].month);
+  var m4 = Math.max(m3, stages[3].month);
+  var rs = (s.saveRate || 0) / 12;
+
+  function requiredMonthly(x3, a3, x4, a4, rr){
+    var f4 = fvFactor(rr, a4);
+    if (!f4) return 0;
+    var carried = x3 * Math.pow(1 + rr, Math.max(0, a4 - a3));
+    var main = (x4 + carried) / f4;
+    var early = x3 / fvFactor(rr, Math.max(1, a3));
+    return Math.max(main, early);
+  }
+  var sPlain = requiredMonthly(need3, m3, need4, m4, 0);
+  var sGrowth = requiredMonthly(need3, m3, need4, m4, rs);
+
+  var capacity = (s.capacityMode === 'manual')
+    ? (s.capacityManual || 0)
+    : Math.max(0, takeHome - (s.otherCommitments || 0));
+  var surplus = capacity - sGrowth;
+
+  var monthsNeeded = m4, achievable = true;
+  if (sGrowth > capacity + 0.5){
+    achievable = false; monthsNeeded = null;
+    for (var t = m4; t <= 360; t++){
+      if (requiredMonthly(need3, m3, need4, t, rs) <= capacity){ monthsNeeded = t; break; }
+    }
+  }
+  var goalFV = surplus > 0 ? surplus * fvFactor((s.goalRate || 0)/12, m4) : 0;
+  /* because the signing lump is often the tighter deadline, a level saving rate
+     can leave you ahead of the total bill by key collection — that surplus is
+     renovation money, not an error */
+  var ahead = Math.max(0, sGrowth * fvFactor(rs, m4) - (need4 + need3 * Math.pow(1 + rs, Math.max(0, m4 - m3))));
+  /* once the signing lump is paid a lower rate usually finishes the job — the
+     "two-speed" plan: heavy now, lighter after the lease is signed */
+  var balAtSign = sGrowth * fvFactor(rs, m3) - need3;
+  var restSpan = Math.max(1, m4 - m3);
+  var afterSign = Math.max(0, (need4 - balAtSign * Math.pow(1 + rs, restSpan)) / fvFactor(rs, restSpan));
+
+  var saveup = {
+    need3: need3, need4: need4, m3: m3, m4: m4,
+    plain: sPlain, growth: sGrowth, capacity: capacity, surplus: surplus,
+    ahead: ahead, afterSign: afterSign,
+    goalFV: goalFV, goalPlain: Math.max(0, surplus) * m4,
+    monthsNeeded: monthsNeeded, achievable: achievable,
+    saveRate: s.saveRate || 0, goalRate: s.goalRate || 0,
+    immediate: stages[0].cash + stages[1].cash
+  };
+
+  return {
+    s: s, single: single, people: people, ratios: ratios, path: path,
+    incomeTotal: incomeTotal, takeHome: takeHome,
+    stages: stages, totals: totals, loan: loan, saveup: saveup,
+    perPerson: people.map(function(p, i){
+      return {
+        name: p.name, ratio: ratios[i],
+        oa: p.oa || 0, monthlyOA: monthlyOA(p, s), takeHome: monthlyTakeHome(p, s),
+        cpf: stages.reduce(function(a,st){ return a + st.byPerson[i].cpf; }, 0),
+        cash: stages.reduce(function(a,st){ return a + st.byPerson[i].cash; }, 0),
+        monthlyShare: inst * ratios[i], cpfShare: oaInflow * ratios[i],
+        basis: p.basis, age: p.age
+      };
+    })
+  };
+}
+
+function compute(s){
+  var R = computeCore(s);
+  R.compare = Object.keys(PATHS).map(function(k){
+    var copy = {};
+    for (var key in s) copy[key] = s[key];
+    copy.loanType = k;
+    var c = computeCore(copy);
+    return {
+      key: k, label: PATHS[k].label,
+      upfront: c.totals.upfront, atKey: c.totals.atKey, cash: c.totals.cash,
+      cpf: c.totals.cpf, monthly: c.loan.monthly, cashTopUp: c.loan.cashTopUp
+    };
+  });
+  return R;
+}
+
+function defaultState(){
+  return {
+    v: 1, mode:'couple', flatType:'4-room', price:550000,
+    grantMode:'auto', grantManual:0, otherGrant:0,
+    loanType:'hdb', rateHdb:0.026, rateBank:0.028, tenure:25, stressAdd:0.01,
+    mBooking:2, mSign:8, mKey:36,
+    gst:1.09, oaRate:0.025, saveRate:0.03, goalRate:0.06,
+    salaryCeiling:8000, seCapAnnual:102000,
+    hps:185, fireOverride:null, townCouncil:0,
+    capacityMode:'auto', capacityManual:0, otherCommitments:1200,
+    splitMode:'equal', splitA:50,
+    people:[
+      { name:'You', income:5000, age:30, oa:20000, basis:'employee' },
+      { name:'Partner', income:4000, age:29, oa:15000, basis:'employee' }
+    ],
+    tab:'payments'
+  };
+}
+
+return {
+  compute: compute, computeCore: computeCore,
+  pmt: pmt, fvFactor: fvFactor, grow: grow,
+  bsd: bsd, legalFee: legalFee, ehgGrant: ehgGrant,
+  optionFee: optionFee, surveyFee: surveyFee, firePremium: firePremium,
+  cpfRates: cpfRates, monthlyOA: monthlyOA, monthlyTakeHome: monthlyTakeHome,
+  ratiosFor: ratiosFor, defaultState: defaultState, PATHS: PATHS,
+  EHG_TIERS: EHG_TIERS, AGE_BANDS: AGE_BANDS, OA_SHARE: OA_SHARE
+};
+})();
+/* ==== BTO ENGINE END ==== */
+</script>
+
+<script>
+(function () {
+'use strict';
+var $ = function (sel, root) { return (root || document).querySelector(sel); };
+var KEY = 'bto-studio-v1';
+
+function fmt(n, d){
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  if (!isFinite(n)) return '∞';
+  var v = Math.abs(n).toLocaleString('en-SG', { minimumFractionDigits: d||0, maximumFractionDigits: d||0 });
+  return (n < 0 ? '-' : '') + '$' + v;
+}
+function pct(x, d){ return (x*100).toFixed(d === undefined ? 2 : d) + '%'; }
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
+
+/* ---------- state ---------- */
+function load(){
+  var d = BTO.defaultState();
+  try {
+    var raw = localStorage.getItem(KEY);
+    if (!raw) return d;
+    var o = JSON.parse(raw);
+    for (var k in d) if (!(k in o)) o[k] = d[k];
+    if (!o.people || !o.people.length) o.people = d.people;
+    while (o.people.length < 2) o.people.push({ name:'Partner', income:0, age:30, oa:0, basis:'employee' });
+    return o;
+  } catch (e) { return d; }
+}
+var state = load();
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+function setPath(obj, path, val){
+  var parts = path.split('.'), o = obj;
+  for (var i = 0; i < parts.length - 1; i++){
+    if (o[parts[i]] === undefined) o[parts[i]] = {};
+    o = o[parts[i]];
+  }
+  o[parts[parts.length-1]] = val;
+}
+
+/* ---------- sidebar ---------- */
+function fNum(path, label, opts){
+  opts = opts || {};
+  var v = getVal(state, path);
+  if (opts.pct && typeof v === 'number') v = Math.round(v * 100 * 10000) / 10000;
+  if (v === null || v === undefined) v = '';
+  return '<div class="field"><label>' + label + '</label><div class="inp">' +
+    (opts.prefix ? '<span class="pfx">' + opts.prefix + '</span>' : '') +
+    '<input type="number" data-bind="' + path + '" value="' + v + '"' +
+    (opts.step ? ' step="' + opts.step + '"' : '') +
+    (opts.min !== undefined ? ' min="' + opts.min + '"' : '') +
+    (opts.max !== undefined ? ' max="' + opts.max + '"' : '') + '>' +
+    (opts.suffix ? '<span class="sfx">' + opts.suffix + '</span>' : '') +
+    '</div></div>';
+}
+function fSel(path, label, options){
+  var v = getVal(state, path);
+  var opts = options.map(function (o) {
+    var val = Array.isArray(o) ? o[0] : o, txt = Array.isArray(o) ? o[1] : o;
+    return '<option value="' + val + '"' + (String(v) === String(val) ? ' selected' : '') + '>' + txt + '</option>';
+  }).join('');
+  return '<div class="field"><label>' + label + '</label><select data-bind="' + path + '">' + opts + '</select></div>';
+}
+function fSeg(path, label, pairs){
+  var v = getVal(state, path);
+  var b = pairs.map(function (p) {
+    return '<button type="button" data-set="' + path + '" data-val="' + p[0] + '"' + (String(v) === String(p[0]) ? ' class="on"' : '') + '>' + p[1] + '</button>';
+  }).join('');
+  return '<div class="field"><label>' + label + '</label><div class="seg">' + b + '</div></div>';
+}
+function getVal(o, path){
+  return path.split('.').reduce(function (a, k) { return (a === null || a === undefined) ? a : a[k]; }, o);
+}
+
+function buildSidebar(){
+  var s = state;
+  var h = [];
+  h.push('<details class="grp" open><summary>The flat</summary><div class="body">');
+  h.push(fSeg('mode', 'Buying as', [['couple','Couple'],['single','Single']]));
+  h.push(fSel('flatType', 'Flat type', [['2-room','2-room Flexi'],['3-room','3-room'],['4-room','4-room'],['5-room','5-room']]));
+  h.push(fNum('price', 'Purchase price', { prefix:'$', step:1000, min:0 }));
+  h.push(fSel('grantMode', 'Housing grant', [['auto','Auto (EHG from income)'],['manual','Enter manually']]));
+  if (s.grantMode === 'manual') h.push(fNum('grantManual', 'Grant amount', { prefix:'$', step:1000, min:0 }));
+  else h.push(fNum('otherGrant', 'Other grants (add-on)', { prefix:'$', step:1000, min:0 }));
+  h.push('<div class="mini" id="grantHint"></div>');
+  h.push('</div></details>');
+
+  h.push('<details class="grp" open><summary>Financing</summary><div class="body">');
+  h.push(fSel('loanType', 'Loan', [
+    ['hdb','HDB loan'],['hdb-staggered','HDB loan — staggered DP'],
+    ['bank75','Bank loan — 75% LTV'],['bank55','Bank loan — 55% LTV']]));
+  h.push(fNum('rateHdb', 'HDB interest rate', { suffix:'% / yr', step:0.1, pct:true }));
+  h.push(fNum('rateBank', 'Bank interest rate', { suffix:'% / yr', step:0.1, pct:true }));
+  h.push(fNum('tenure', 'Loan tenure', { suffix:'years', step:1, min:5, max:30 }));
+  h.push(fNum('stressAdd', 'Stress-test add-on', { suffix:'% / yr', step:0.25, min:0, pct:true }));
+  h.push('</div></details>');
+
+  h.push('<details class="grp" open><summary>Timeline</summary><div class="body">');
+  h.push(fNum('mBooking', 'Months to flat booking', { suffix:'months', step:1, min:0 }));
+  h.push(fNum('mSign', 'Months to sign lease', { suffix:'months', step:1, min:1 }));
+  h.push(fNum('mKey', 'Months to key collection', { suffix:'months', step:1, min:2 }));
+  h.push('<div class="seg" style="margin-top:6px">' +
+    [['24','2 yrs'],['36','3 yrs'],['48','4 yrs'],['60','5 yrs']].map(function(p){
+      return '<button type="button" data-set="mKey" data-val="' + p[0] + '"' + (String(s.mKey) === p[0] ? ' class="on"' : '') + '>' + p[1] + '</button>';
+    }).join('') + '</div>');
+  h.push('</div></details>');
+
+  h.push('<details class="grp" open><summary>' + (s.mode === 'single' ? 'You' : 'Both of you') + '</summary><div class="body">');
+  var count = s.mode === 'single' ? 1 : 2;
+  for (var i = 0; i < count; i++){
+    var p = s.people[i];
+    h.push('<div class="field" style="margin-bottom:10px"><label><b>' + (i === 0 ? (s.mode === 'single' ? 'Your details' : 'Person A') : 'Person B') + '</b></label>' +
+      '<div class="inp" style="margin-bottom:6px"><input type="text" data-bind="people.' + i + '.name" value="' + esc(p.name) + '" placeholder="Name"></div>' +
+      '<div class="inp" style="margin-bottom:6px"><span class="pfx">$</span><input type="number" data-bind="people.' + i + '.income" value="' + (p.income||0) + '" step="100" placeholder="Gross monthly income"><span class="sfx">/mth</span></div>' +
+      '<div class="inp" style="margin-bottom:6px"><span class="pfx">Age</span><input type="number" data-bind="people.' + i + '.age" value="' + (p.age||30) + '" step="1"><span class="sfx">yrs</span></div>' +
+      '<div class="inp" style="margin-bottom:6px"><span class="pfx">OA</span><input type="number" data-bind="people.' + i + '.oa" value="' + (p.oa||0) + '" step="1000"><span class="sfx">balance</span></div>' +
+      '<select data-bind="people.' + i + '.basis">' +
+        '<option value="employee"' + (p.basis === 'employee' ? ' selected' : '') + '>Employee (CPF on salary)</option>' +
+        '<option value="self"' + (p.basis === 'self' ? ' selected' : '') + '>Self-employed (voluntary CPF)</option>' +
+      '</select></div>');
+  }
+  h.push('</div></details>');
+
+  if (s.mode === 'couple'){
+    h.push('<details class="grp" open><summary>Split between the two of you</summary><div class="body">');
+    h.push(fSeg('splitMode', 'Split method', [['equal','50 / 50'],['income','By income'],['custom','Custom']]));
+    if (s.splitMode === 'custom') h.push(fNum('splitA', 'Person A share', { suffix:'%', step:5, min:0, max:100 }));
+    h.push('<div class="mini">Shares drive who funds which part of each payment, and the monthly instalment.</div>');
+    h.push('</div></details>');
+  }
+
+  h.push('<details class="grp" open><summary>Savings &amp; other goals</summary><div class="body">');
+  h.push(fNum('saveRate', 'Return on your savings', { suffix:'% / yr', step:0.5, min:0, pct:true }));
+  h.push(fNum('goalRate', 'Return on other investments', { suffix:'% / yr', step:0.5, min:0, pct:true }));
+  h.push(fSeg('capacityMode', 'Monthly cash available', [['auto','Auto'],['manual','Manual']]));
+  if (s.capacityMode === 'manual') h.push(fNum('capacityManual', 'Set aside per month', { prefix:'$', step:100, min:0 }));
+  h.push(fNum('otherCommitments', 'Other monthly commitments', { prefix:'$', step:100, min:0 }));
+  h.push('</div></details>');
+
+  h.push('<details class="grp"><summary>Advanced</summary><div class="body">');
+  h.push(fNum('gst', 'GST multiplier', { step:0.01 }));
+  h.push(fNum('oaRate', 'CPF OA interest', { suffix:'% / yr', step:0.1 }));
+  h.push(fNum('salaryCeiling', 'CPF salary ceiling', { prefix:'$', suffix:'/mth', step:100 }));
+  h.push(fNum('hps', 'HPS premium', { prefix:'$', step:5 }));
+  h.push(fNum('townCouncil', 'Advanced town council fee', { prefix:'$', step:10 }));
+  h.push('<div class="mini">Fire insurance follows the flat type — override it only if you have a quote.</div>');
+  h.push('</div></details>');
+
+  $('#side').innerHTML = h.join('');
+  var hint = $('#grantHint');
+  if (hint){
+    var R = BTO.compute(state);
+    hint.innerHTML = (state.grantMode === 'auto'
+        ? 'EHG <b>' + fmt(R.totals.ehgAuto) + '</b>'
+        : 'Grant <b>' + fmt(state.grantManual || 0) + '</b>') +
+      (state.grantMode === 'auto' && state.otherGrant ? ' + ' + fmt(state.otherGrant) + ' other' : '') +
+      ' · net price <b>' + fmt(R.totals.net) + '</b>';
+  }
+}
+
+/* ---------- charts ---------- */
+function svgStack(rows){
+  var max = Math.max.apply(null, rows.map(function(r){ return r.cpf + r.cash; }).concat([1]));
+  return rows.map(function(r){
+    var tot = r.cpf + r.cash;
+    var w1 = (r.cpf / max) * 100, w2 = (r.cash / max) * 100;
+    return '<div class="bar"><div class="t">' + r.label + '</div>' +
+      '<div class="track"><div class="seg1" style="width:' + w1 + '%"></div><div class="seg2" style="width:' + w2 + '%"></div></div>' +
+      '<div class="v">' + fmt(tot) + '</div></div>';
+  }).join('');
+}
+function lineChart(opts){
+  var w = 660, h = opts.h || 220, padL = 58, padR = 10, padT = 10, padB = 26;
+  var series = opts.series, maxX = opts.maxX || 1;
+  var maxY = 0;
+  series.forEach(function(s){ s.points.forEach(function(p){ if (p[1] > maxY) maxY = p[1]; }); });
+  maxY = maxY * 1.08 || 1;
+  var step = Math.pow(10, Math.floor(Math.log(maxY) / Math.LN10));
+  var nicety = [1,2,2.5,5,10].map(function(m){ return step*m; }).filter(function(v){ return v >= maxY/4; })[0] || maxY;
+  maxY = Math.ceil(maxY / nicety) * nicety;
+  var X = function(x){ return padL + (x / maxX) * (w - padL - padR); };
+  var Y = function(y){ return h - padB - (y / maxY) * (h - padT - padB); };
+  var out = ['<div class="svgwrap"><svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;min-width:420px" preserveAspectRatio="xMidYMid meet">'];
+  for (var i = 0; i <= 4; i++){
+    var yv = maxY * i / 4;
+    out.push('<line x1="' + padL + '" y1="' + Y(yv) + '" x2="' + (w - padR) + '" y2="' + Y(yv) + '" stroke="currentColor" stroke-opacity=".13"/>');
+    out.push('<text x="' + (padL - 7) + '" y="' + (Y(yv) + 3.5) + '" text-anchor="end" font-size="9.5" fill="currentColor" fill-opacity=".55">' + fmt(yv).replace('.0','') + '</text>');
+  }
+  var ticks = 4;
+  for (var t = 0; t <= ticks; t++){
+    var xv = maxX * t / ticks;
+    out.push('<text x="' + X(xv) + '" y="' + (h - 8) + '" text-anchor="middle" font-size="9.5" fill="currentColor" fill-opacity=".55">' + Math.round(xv) + 'm</text>');
+  }
+  series.forEach(function(s){
+    var d = s.points.map(function(p, i){ return (i ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1); }).join(' ');
+    out.push('<path d="' + d + '" fill="none" stroke="' + s.color + '" stroke-width="2.2" stroke-linejoin="round"' + (s.dash ? ' stroke-dasharray="5 4"' : '') + '/>');
+  });
+  out.push('</svg></div>');
+  return out.join('');
+}
+
+/* ---------- views ---------- */
+function kpi(k, v, s, hi){ return '<div class="kpi' + (hi ? ' hi' : '') + '"><div class="k">' + k + '</div><div class="v">' + v + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; }
+
+function viewPayments(R){
+  var out = [];
+  out.push('<div class="kpis">');
+  out.push(kpi('Total cash out of pocket', fmt(R.totals.cash), 'across all four stages', true));
+  out.push(kpi('Paid from CPF OA', fmt(R.totals.cpf), 'including your grant ' + fmt(R.totals.grant)));
+  out.push(kpi('Due before key collection', fmt(R.totals.upfront), 'stages 1–3'));
+  out.push(kpi('Due at key collection', fmt(R.totals.atKey), 'stage 4'));
+  out.push('</div>');
+
+  out.push('<div class="card"><h3 class="h">Cash vs CPF, stage by stage</h3>' +
+    '<div class="legend"><span><i style="background:var(--cpf)"></i>CPF OA</span><span><i style="background:var(--cash)"></i>Cash</span></div>' +
+    '<div class="svgwrap">' + svgStack(R.stages.map(function(st){
+      return { label: st.label.replace(/^\d+ · /,'') + '<br><span style="opacity:.7">' + st.when + '</span>', cpf: st.cpfUsed, cash: st.cash };
+    })) + '</div></div>');
+
+  out.push('<div class="card"><h3 class="h">Every payment</h3><table>' +
+    '<tr><th>Item</th><th>Pay from</th><th>Amount</th><th>Note</th></tr>');
+  R.stages.forEach(function(st){
+    out.push('<tr class="sect"><td colspan="4">' + st.label + ' — ' + st.when + '</td></tr>');
+    st.items.forEach(function(it){
+      out.push('<tr><td>' + it.n + '</td><td>' +
+        '<span class="badge ' + (it.p === 'cash' ? 'cash' : 'cpf') + '">' + (it.p === 'cash' ? 'CASH' : 'CPF / cash') + '</span></td>' +
+        '<td>' + fmt(it.a) + '</td><td class="note">' + (it.note || '') + '</td></tr>');
+    });
+    out.push('<tr class="tot"><td>Stage total</td><td></td><td>' + fmt(st.total) + '</td>' +
+      '<td class="note">' + fmt(st.cpfUsed) + ' CPF · ' + fmt(st.cash) + ' cash</td></tr>');
+  });
+  out.push('<tr class="tot"><td>Grand total</td><td></td><td>' + fmt(R.totals.all) + '</td><td class="note">flat ' + fmt(R.totals.dpTotal) + ' downpayment + ' + fmt(R.totals.bsd) + ' stamp duty + ' + fmt(R.totals.legal) + ' legal + fees</td></tr>');
+  out.push('</table>');
+  out.push('<div class="msg">Your CPF OA is projected forward with monthly contributions and ' + pct(R.s.oaRate,1) + ' interest: ' +
+    fmt(R.stages[2].oaAvail) + ' available by signing, ' + fmt(R.stages[3].oaAvail) + ' by key collection. Whatever CPF cannot cover becomes cash.</div>');
+  out.push('</div>');
+
+  out.push('<div class="card"><h3 class="h">Same flat, four financing routes</h3><table>' +
+    '<tr><th>Route</th><th>Cash by signing</th><th>Cash at key</th><th>Total cash</th><th>Monthly</th><th>Cash top-up</th></tr>');
+  R.compare.forEach(function(c){
+    out.push('<tr' + (c.key === R.s.loanType ? ' class="tot"' : '') + '><td>' + c.label + '</td><td>' + fmt(c.upfront) + '</td><td>' +
+      fmt(c.atKey) + '</td><td>' + fmt(c.cash) + '</td><td>' + fmt(c.monthly) + '</td><td>' + fmt(c.cashTopUp) + '</td></tr>');
+  });
+  out.push('</table><div class="msg">Staggered downpayment is only available to first-timer couples (and downsizers to a 3-room or smaller flat in a non-mature estate) — not to singles. Bank loans are fixed at the bank\u2019s rate for the lock-in, HDB loans track the CPF OA rate + 0.1%.</div></div>');
+  return out.join('');
+}
+
+function viewLoan(R){
+  var out = [];
+  var L = R.loan;
+  out.push('<div class="kpis">');
+  out.push(kpi('Loan amount', fmt(L.amount), Math.round(R.totals.dpTotal / (R.totals.net||1) * 100) + '% downpayment, ' + Math.round(100 - R.totals.dpTotal / (R.totals.net||1) * 100) + '% borrowed'));
+  out.push(kpi('Monthly instalment', fmt(L.monthly, 0), L.tenure + ' yrs at ' + pct(L.rate, 2), true));
+  out.push(kpi('CPF OA covers', fmt(Math.min(L.monthly, L.cpfInflow)), 'from monthly contributions'));
+  out.push(kpi('Cash top-up', fmt(L.cashTopUp), L.cashTopUp > 0 ? 'every month' : 'nothing — CPF covers it', L.cashTopUp === 0));
+  out.push('</div>');
+
+  out.push('<div class="card"><h3 class="h">The monthly repayment, split</h3><table>' +
+    '<tr><th>Line</th><th>Per month</th><th>Note</th></tr>' +
+    '<tr><td>Instalment</td><td>' + fmt(L.monthly) + '</td><td class="note">' + L.label + ', ' + L.tenure + ' years</td></tr>' +
+    '<tr><td>CPF OA inflow from salary</td><td>' + fmt(L.cpfInflow) + '</td><td class="note">employee + employer CPF × OA share</td></tr>' +
+    '<tr class="tot"><td>Cash you must add</td><td>' + fmt(L.cashTopUp) + '</td><td class="note">' +
+      (L.cashTopUp > 0 ? 'this is the real monthly cash cost of the flat' : 'fully covered by CPF — the flat costs no cash each month') + '</td></tr>' +
+    '<tr><td>CPF OA left at key collection</td><td>' + fmt(L.oaAtKey) + '</td><td class="note">spare cushion after all payments</td></tr>' +
+    '<tr><td>Months that cushion absorbs a shortfall</td><td>' + (isFinite(L.coveredMonths) ? Math.round(L.coveredMonths) : '—') + '</td><td class="note">if the instalment exceeds your OA inflow</td></tr>' +
+    '<tr><td>Total interest over the loan</td><td>' + fmt(L.totalInterest) + '</td><td class="note">total paid ' + fmt(L.totalPaid) + '</td></tr>' +
+    '</table></div>');
+
+  out.push('<div class="card"><h3 class="h">If rates move</h3><table>' +
+    '<tr><th>Scenario</th><th>Rate</th><th>Instalment</th><th>CPF covers</th><th>Cash top-up</th></tr>' +
+    '<tr><td>Today</td><td>' + pct(L.rate,2) + '</td><td>' + fmt(L.monthly) + '</td><td>' + fmt(Math.min(L.monthly, L.cpfInflow)) + '</td><td>' + fmt(L.cashTopUp) + '</td></tr>' +
+    '<tr><td>Stress test</td><td>' + pct(L.stressRate,2) + '</td><td>' + fmt(L.stressMonthly) + '</td><td>' + fmt(Math.min(L.stressMonthly, L.cpfInflow)) + '</td><td>' + fmt(L.stressTopUp) + '</td></tr>' +
+    '</table>' +
+    '<div class="msg ' + (L.cashTopUp === 0 ? 'ok' : '') + '">' +
+      (L.cashTopUp === 0
+        ? 'Your CPF OA inflow alone pays the instalment. That is the strongest position to be in — the mortgage never touches your take-home pay.'
+        : 'You need <b>' + fmt(L.cashTopUp) + '</b> of cash every month on top of CPF, or <b>' + fmt(L.stressTopUp) + '</b> if rates rise to ' + pct(L.stressRate,2) + '. Plan the budget around the stress figure.') +
+    '</div>' +
+    '<div class="msg">Mortgage servicing ratio: instalment is <b>' + pct(L.msr,1) + '</b> of gross household income (MSR cap for an HDB flat is 30%, TDSR 55%).' +
+      (L.msr > 0.30 ? ' <b>Above the 30% MSR cap — this loan would not pass.</b>' : '') + '</div></div>');
+
+  out.push('<div class="card"><h3 class="h">Interest vs principal over the years</h3>' + interestChart(L) + '</div>');
+  return out.join('');
+}
+function interestChart(L){
+  var series = [], bal = L.amount, points = [], interest = [], cum = 0;
+  var r = L.rate / 12;
+  for (var m = 0; m <= L.n; m++){
+    if (m > 0){
+      var int = bal * r;
+      cum += int;
+      bal = Math.max(0, bal + int - L.monthly);
+    }
+    points.push([m / 12 * 12, bal]);
+    interest.push([m, cum]);
+  }
+  series.push({ color:'var(--cpf)', points: points.filter(function(p, i){ return i % 12 === 0; }) });
+  series.push({ color:'var(--cash)', points: interest.filter(function(p, i){ return i % 12 === 0; }), dash:true });
+  return '<div class="legend"><span><i style="background:var(--cpf)"></i>Outstanding balance</span><span><i style="background:var(--cash)"></i>Cumulative interest</span></div>' +
+    lineChart({ series: series, maxX: L.n, h: 210 });
+}
+
+function viewSaveUp(R){
+  var S = R.saveup, L = R.loan;
+  var out = [];
+  out.push('<div class="kpis">');
+  out.push(kpi('Save each month — cash', fmt(S.growth), 'for ' + S.m4 + ' months at ' + pct(S.saveRate,1), true));
+  out.push(kpi('You can set aside', fmt(S.capacity), R.s.capacityMode === 'manual' ? 'manual figure' : 'take-home less commitments'));
+  out.push(kpi(S.surplus >= 0 ? 'Spare for other goals' : 'Shortfall each month', fmt(Math.abs(S.surplus)),
+    S.surplus >= 0 ? 'free cash after the house' : 'more needed than you have', S.surplus >= 0));
+  out.push(kpi('After the lease is signed', fmt(S.afterSign), 'two-speed plan: lighter from month ' + S.m3));
+  out.push('</div>');
+
+  out.push('<div class="card"><h3 class="h">Cash needed vs cash saved</h3>' +
+    '<div class="legend"><span><i style="background:var(--gold)"></i>Cash required by each stage</span><span><i style="background:var(--accent)"></i>Your savings at the required rate</span></div>' +
+    saveCurve(R) +
+    '<div class="msg">The flat needs <b>' + fmt(S.immediate) + '</b> almost immediately (application plus option fee), then <b>' + fmt(S.need3) +
+    '</b> at signing and <b>' + fmt(S.need4) + '</b> at key collection. Locking in <b>' + fmt(S.growth) + ' a month</b> from now clears both (' + fmt(S.plain) + ' without investing it)' +
+    (S.ahead > 250 ? '. Because the signing payment is the tighter deadline, that rate leaves you about <b>' + fmt(S.ahead) + '</b> ahead by key collection — renovation money, or a reason to drop to <b>' + fmt(S.afterSign) + '</b> a month once the lease is signed.' : '.') +
+    '</div></div>');
+
+  out.push('<div class="grid2">');
+  out.push('<div class="card"><h3 class="h">What that leaves for other goals</h3>' +
+    '<table><tr><th>Use of monthly cash</th><th>Amount</th></tr>' +
+    '<tr><td>Take-home pay</td><td>' + fmt(R.takeHome) + '</td></tr>' +
+    '<tr><td>Less other commitments</td><td>-' + fmt(R.s.otherCommitments || 0) + '</td></tr>' +
+    '<tr class="tot"><td>Available</td><td>' + fmt(S.capacity) + '</td></tr>' +
+    '<tr><td>Less house savings</td><td>-' + fmt(S.growth) + '</td></tr>' +
+    '<tr class="tot"><td>' + (S.surplus >= 0 ? 'Free for investments' : 'Shortfall') + '</td><td class="' + (S.surplus >= 0 ? 'up' : 'down') + '">' + fmt(S.surplus) + '</td></tr>' +
+    '</table>' +
+    '<div class="msg">If the spare <b>' + fmt(Math.max(0, S.surplus)) + '</b> a month goes into a portfolio at ' + pct(S.goalRate,1) +
+    ', it is worth about <b>' + fmt(S.goalFV) + '</b> by key collection — without touching the house plan.</div></div>');
+
+  var afterKey = R.takeHome - L.cashTopUp;
+  out.push('<div class="card"><h3 class="h">After key collection</h3>' +
+    '<table><tr><th>Line</th><th>Per month</th></tr>' +
+    '<tr><td>Take-home pay</td><td>' + fmt(R.takeHome) + '</td></tr>' +
+    '<tr><td>House savings (finished)</td><td>$0</td></tr>' +
+    '<tr><td>Mortgage cash top-up</td><td>-' + fmt(L.cashTopUp) + '</td></tr>' +
+    '<tr class="tot"><td>Left for other goals</td><td class="' + (afterKey >= 0 ? 'up' : 'down') + '">' +
+      fmt(afterKey) + '</td></tr></table>' +
+    '<div class="msg">Once the keys are in hand the savings discipline stops and the flat costs only <b>' + fmt(L.cashTopUp) +
+    '</b> in cash per month' + (L.cashTopUp === 0 ? ' — nothing at all, because CPF OA covers the instalment.' : '.') + '</div></div>');
+  out.push('</div>');
+
+  var msg = [];
+  if (!S.achievable && S.monthsNeeded){
+    msg.push('<div class="msg warn">At <b>' + fmt(S.capacity) + '</b> a month you cannot hit key collection in ' + S.m4 + ' months. The same flat is funded by month <b>' + S.monthsNeeded + '</b> (' + (S.monthsNeeded/12).toFixed(1) + ' years) — either save more, choose a cheaper flat or a staggered route.</div>');
+  } else if (!S.achievable){
+    msg.push('<div class="msg warn">Your available cash does not cover even the signing-stage payment of <b>' + fmt(S.need3) + '</b>. The gap has to come from somewhere: a smaller flat, a bigger grant, more CPF OA, or family support.</div>');
+  } else if (S.surplus > 0){
+    msg.push('<div class="msg ok">Clear to proceed: <b>' + fmt(S.surplus) + '</b> a month stays free for your other goals after funding the flat.</div>');
+  }
+  out.push('<div class="card">' + msg.join('') +
+    '<h3 class="h" style="margin-top:14px">Three levers if the number is too high</h3><ul class="clean">' +
+    '<li><b>Stretch the timeline.</b> Every extra year of construction lowers the monthly saving — try the 3 / 4 / 5 year buttons in the sidebar.</li>' +
+    '<li><b>Change the route.</b> Staggered HDB downpayment halves what is due at signing; a bank loan shifts more of the downpayment earlier and demands cash.</li>' +
+    '<li><b>Let CPF do the work.</b> Every month of construction adds about <b>' + fmt(R.loan.cpfInflow) + '</b> of OA that pays both the downpayment and later the instalment.</li>' +
+    '</ul></div>');
+  return out.join('');
+}
+function saveCurve(R){
+  var S = R.saveup, pts = [], saved = [[0,0]];
+  var r = S.saveRate / 12;
+  var need = S.immediate;
+  pts.push([0, need]);
+  if (S.m3 > 0){ pts.push([S.m3, need]); }
+  need += S.need3; pts.push([S.m3, need]);
+  pts.push([S.m4, need]); need += S.need4; pts.push([S.m4, need]);
+  for (var m = 1; m <= S.m4; m++) saved.push([m, S.growth * BTO.fvFactor(r, m)]);
+  return lineChart({
+    series: [
+      { color:'var(--gold)', points: pts },
+      { color:'var(--accent)', points: saved }
+    ],
+    maxX: S.m4, h: 230
+  });
+}
+
+function viewSplit(R){
+  var out = [];
+  if (R.single){
+    out.push('<div class="kpis">');
+    out.push(kpi('Buying alone', '1 person', 'Single Singapore Citizen scheme'));
+    out.push(kpi('Cash needed in total', fmt(R.totals.cash), 'across all stages', true));
+    out.push(kpi('Monthly instalment', fmt(R.loan.monthly), 'CPF covers ' + fmt(Math.min(R.loan.monthly, R.loan.cpfInflow))));
+    out.push(kpi('Save each month', fmt(R.saveup.growth), 'for ' + R.saveup.m4 + ' months'));
+    out.push('</div>');
+    out.push('<div class="card"><h3 class="h">What changes buying alone</h3><ul class="clean">' +
+      '<li><b>One income, one OA.</b> All ' + fmt(R.totals.cash) + ' of cash and ' + fmt(R.totals.cpf) + ' of CPF come from you.</li>' +
+      '<li><b>No staggered downpayment.</b> The staggered scheme is for first-timer couples (and downsizers); singles pay the normal schedule — ' +
+        Math.round(R.path.sign*100) + '% of the price at signing, the rest at key collection.</li>' +
+      '<li><b>Two-room Flexi in a non-mature estate</b> is the typical route under the Single Singapore Citizen scheme; grants are at half the couple rate (' + fmt(R.totals.ehgAuto) + ' here).</li>' +
+      '<li><b>The mortgage must fit one salary.</b> Instalment is ' + pct(R.loan.msr,1) + ' of your gross income, against a 30% MSR cap.</li>' +
+      '</ul></div>');
+    out.push(personTable(R));
+    return out.join('');
+  }
+
+  out.push('<div class="kpis">');
+  out.push(kpi('Split', R.ratios.map(function(r, i){ return Math.round(r*100) + '%'; }).join(' / '), R.s.splitMode === 'income' ? 'by income' : (R.s.splitMode === 'custom' ? 'custom' : 'equal shares')));
+  out.push(kpi('Household cash needed', fmt(R.totals.cash), 'both of you together', true));
+  out.push(kpi('Household CPF used', fmt(R.totals.cpf), 'from both OA accounts'));
+  out.push(kpi('Monthly instalment', fmt(R.loan.monthly), 'cash top-up ' + fmt(R.loan.cashTopUp)));
+  out.push('</div>');
+  out.push(personTable(R));
+  out.push('<div class="card"><h3 class="h">How the two of you can rebalance</h3>' +
+    '<div class="msg">Shares are a negotiating position, not a rule. What matters is that each person\u2019s CPF OA can absorb their share at signing — ' +
+    'if one side runs out of OA, the shortfall instantly becomes cash. Try “By income” in the sidebar to see the fair split, or set a custom ratio.</div>' +
+    '<table style="margin-top:10px"><tr><th>Scenario</th><th>Person A cash</th><th>Person B cash</th><th>A monthly</th><th>B monthly</th></tr>' +
+    ['equal','income'].map(function(mode){
+      var copy = {}; for (var k in R.s) copy[k] = R.s[k];
+      copy.splitMode = mode;
+      var c = BTO.computeCore(copy);
+      return '<tr' + (R.s.splitMode === mode ? ' class="tot"' : '') + '><td>' + (mode === 'equal' ? '50 / 50' : 'By income') + '</td><td>' +
+        fmt(c.perPerson[0].cash) + '</td><td>' + fmt(c.perPerson[1].cash) + '</td><td>' + fmt(c.perPerson[0].monthlyShare) + '</td><td>' + fmt(c.perPerson[1].monthlyShare) + '</td></tr>';
+    }).join('') + '</table></div>');
+  return out.join('');
+}
+function personTable(R){
+  var h = ['<div class="card"><h3 class="h">Who pays what</h3><table><tr><th>Person</th><th>Share</th><th>CPF OA used</th><th>Cash</th><th>Monthly share</th><th>Take-home</th></tr>'];
+  R.perPerson.forEach(function(p){
+    h.push('<tr><td><b>' + esc(p.name) + '</b><div class="mini">' + fmt(p.oa) + ' OA today · ' + fmt(p.monthlyOA) + '/mth inflow</div></td>' +
+      '<td>' + Math.round(p.ratio*100) + '%</td><td>' + fmt(p.cpf) + '</td><td>' + fmt(p.cash) + '</td>' +
+      '<td>' + fmt(p.monthlyShare) + '</td><td>' + fmt(p.takeHome) + '</td></tr>');
+  });
+  h.push('<tr class="tot"><td>Together</td><td>100%</td><td>' + fmt(R.totals.cpf) + '</td><td>' + fmt(R.totals.cash) + '</td><td>' + fmt(R.loan.monthly) + '</td><td>' + fmt(R.takeHome) + '</td></tr>');
+  h.push('</table><div class="mini" style="margin-top:8px">Monthly share is the instalment split by the same ratio; CPF OA inflow pays it first, cash covers the rest.</div></div>');
+  return h.join('');
+}
+
+function viewSummary(R){
+  var S = R.saveup, L = R.loan;
+  var out = [];
+  out.push('<div class="card"><h3 class="h">' + R.s.flatType + ' BTO at ' + fmt(R.totals.gross) +
+    ' — ' + (R.single ? 'single buyer' : 'couple') + '</h3>' +
+    '<div class="kpis" style="margin-top:4px">');
+  out.push(kpi('Cash needed in total', fmt(R.totals.cash), 'from today to key collection', true));
+  out.push(kpi('CPF OA used', fmt(R.totals.cpf), 'plus grant ' + fmt(R.totals.grant)));
+  out.push(kpi('Save per month now', fmt(S.growth), 'for ' + S.m4 + ' months'));
+  out.push(kpi('Monthly instalment', fmt(L.monthly), 'CPF ' + fmt(Math.min(L.monthly, L.cpfInflow)) + ' · cash ' + fmt(L.cashTopUp)));
+  out.push(kpi('Left for other goals', fmt(Math.max(0, S.surplus)), 'per month, during construction', true));
+  out.push('</div>');
+
+  out.push('<table><tr><th>Milestone</th><th>When</th><th>Cash</th><th>CPF</th></tr>');
+  R.stages.forEach(function(st){
+    out.push('<tr><td>' + st.label + '</td><td class="note">' + st.when + '</td><td>' + fmt(st.cash) + '</td><td>' + fmt(st.cpfUsed) + '</td></tr>');
+  });
+  out.push('<tr class="tot"><td>Total</td><td></td><td>' + fmt(R.totals.cash) + '</td><td>' + fmt(R.totals.cpf) + '</td></tr></table></div>');
+
+  out.push('<div class="card"><h3 class="h">The plan in one paragraph</h3><p class="mini" style="font-size:13px;line-height:1.7;color:var(--txt)">' +
+    'You buy a ' + R.s.flatType + ' flat at ' + fmt(R.totals.gross) + '. After a grant of ' + fmt(R.totals.grant) + ' the price is ' + fmt(R.totals.net) +
+    ', of which ' + fmt(R.totals.dpTotal) + ' is downpayment and ' + fmt(L.amount) + ' is borrowed on a ' + L.label.toLowerCase() + ' over ' + L.tenure + ' years at ' + pct(L.rate,2) +
+    '. The instalment is ' + fmt(L.monthly) + ' a month; CPF OA from your salary pays ' + fmt(Math.min(L.monthly, L.cpfInflow)) + ' of it' +
+    (L.cashTopUp > 0 ? ' and the remaining ' + fmt(L.cashTopUp) + ' is cash.' : ' and nothing comes out of your pocket.') +
+    ' Between now and key collection the flat needs ' + fmt(R.totals.cash) + ' of cash in total, so setting aside ' + fmt(S.growth) + ' a month for ' + S.m4 + ' months covers it' +
+    (S.surplus >= 0 ? ', leaving ' + fmt(S.surplus) + ' a month free for your investment goals' : ' — ' + fmt(-S.surplus) + ' a month more than you currently have available') + '.</p></div>');
+
+  out.push('<div class="card"><h3 class="h">Assumptions on this page</h3><ul class="clean">' +
+    '<li>Purchase price ' + fmt(R.totals.gross) + ', ' + R.s.flatType + ', grant ' + fmt(R.totals.grant) + ' (EHG ' + fmt(R.totals.ehgAuto) + (R.s.otherGrant ? ' + other ' + fmt(R.s.otherGrant) : '') + ').</li>' +
+    '<li>Stamp duty ' + fmt(R.totals.bsd) + ' and legal ' + fmt(R.totals.legal) + ' computed on the price before grant.</li>' +
+    '<li>CPF OA grows ' + pct(R.s.oaRate,1) + ' a year; savings grow ' + pct(S.saveRate,1) + ' a year; other investments ' + pct(S.goalRate,1) + '.</li>' +
+    '<li>Key collection ' + R.s.mKey + ' months out, signing at ' + R.s.mSign + '. HPS ' + fmt(R.s.hps) + ', fire insurance per flat type.</li>' +
+    '</ul></div>');
+  return out.join('');
+}
+
+var CHECKLIST = [
+  ['Before key collection', [
+    ['Purchase HDB fire insurance', 'Etiqa — required before key collection'],
+    ['Decide whether to wipe out CPF OA or keep a reserve', 'keeping $20k in OA is a common choice'],
+    ['Agree the HDB loan tenure (max 25 years for a new flat)', 'longer tenure = lower instalment, more interest'],
+    ['Agree the split ratio for the instalment', 'e.g. 50/50 or 75/25 between the two of you']
+  ]],
+  ['What to bring on key collection day', [
+    ['NRIC / Singpass — both owners', ''],
+    ['SMS confirmation of the appointment', 'shown at the security counter'],
+    ['Fire insurance policy number', ''],
+    ['NETS card for the first town council fee', 'NETS only']
+  ]],
+  ['After key collection', [
+    ['Activate the SP utilities account', 'do it near the defect-check day to avoid paying for an empty flat'],
+    ['Change your address on Singpass (ICA)', ''],
+    ['Claim CDC and Climate vouchers once the address is updated', 'signup.redeem.gov.sg'],
+    ['Apply for season parking if you drive', '']
+  ]],
+  ['First visit to the new home', [
+    ['Bicycle lock for the gate', 'easy re-entry during renovation'],
+    ['Portable fan, masks, tissues', 'it will be dusty'],
+    ['Check every key works — doors, windows, gate', ''],
+    ['Open the letterbox for the clutch keys', 'needed to turn on the water mains'],
+    ['Do the defect check, or engage a professional', 'report to the Building Services Centre'],
+    ['Book the joint inspection with the BSC early', 'slots fill up fast']
+  ]]
+];
+function viewChecklist(){
+  var out = ['<div class="card"><h3 class="h">Key collection checklist</h3><div class="mini">Ticks are stored in this browser only.</div></div>'];
+  var idx = 0;
+  CHECKLIST.forEach(function(group){
+    out.push('<div class="card"><h3 class="h">' + group[0] + '</h3>');
+    group[1].forEach(function(item){
+      idx++;
+      var key = 'chk-' + idx;
+      var done = false;
+      try { done = localStorage.getItem(KEY + '-' + key) === '1'; } catch (e) {}
+      out.push('<label class="chk"><input type="checkbox" data-chk="' + key + '"' + (done ? ' checked' : '') + '>' +
+        '<span>' + esc(item[0]) + (item[1] ? '<div class="n">' + esc(item[1]) + '</div>' : '') + '</span></label>');
+    });
+    out.push('</div>');
+  });
+  return out.join('');
+}
+
+/* ---------- render ---------- */
+var VIEWS = { payments: viewPayments, loan: viewLoan, saveup: viewSaveUp, split: viewSplit, summary: viewSummary, checklist: viewChecklist };
+var current = null;
+
+function render(){
+  var R = BTO.compute(state);
+  current = R;
+  var fn = VIEWS[state.tab] || viewPayments;
+  try {
+    $('#view').innerHTML = fn(R);
+  } catch (err) {
+    $('#view').innerHTML = '<div class="card"><h3 class="h">Something broke on this tab</h3>' +
+      '<div class="msg warn">' + esc(err && err.message ? err.message : String(err)) + '</div>' +
+      '<div class="mini" style="margin-top:8px">Try Reset in the header. Your inputs are saved locally, not sent anywhere.</div></div>';
+    if (window.console) console.error(err);
+  }
+  $('#pillMode').textContent = state.mode === 'single' ? 'Single' : 'Couple';
+  $('#pillLoan').textContent = BTO.PATHS[state.loanType].label;
+  $$('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === state.tab); });
+}
+function $$(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+
+/* ---------- events ---------- */
+var timer = null;
+function schedule(){ clearTimeout(timer); timer = setTimeout(render, 40); }
+
+document.addEventListener('input', function (e) {
+  var el = e.target;
+  if (el.dataset && el.dataset.chk){
+    try { localStorage.setItem(KEY + '-' + el.dataset.chk, el.checked ? '1' : '0'); } catch (err) {}
+    return;
+  }
+  var path = el.dataset ? el.dataset.bind : null;
+  if (!path) return;
+  var val;
+  if (el.type === 'number'){
+    val = el.value === '' ? null : parseFloat(el.value);
+    if (path === 'rateHdb' || path === 'rateBank' || path === 'saveRate' || path === 'goalRate' ||
+        path === 'oaRate' || path === 'stressAdd') val = (val === null ? 0 : val) / 100;
+  } else if (el.type === 'checkbox'){
+    val = el.checked;
+  } else {
+    val = el.value;
+  }
+  setPath(state, path, val);
+  save();
+  var rebuild = ['mode', 'loanType', 'grantMode', 'splitMode', 'capacityMode'].indexOf(path) >= 0;
+  if (rebuild){ buildSidebar(); }
+  schedule();
+});
+document.addEventListener('change', function (e) {
+  var el = e.target;
+  if (el.tagName === 'SELECT' && el.dataset.bind){
+    setPath(state, el.dataset.bind, el.value);
+    save();
+    var rebuild = ['loanType','grantMode','basis'].indexOf(el.dataset.bind.split('.')[0]) >= 0 ||
+      (el.dataset.bind.indexOf('.basis') >= 0);
+    if (rebuild) buildSidebar();
+    schedule();
+  }
+});
+document.addEventListener('click', function (e) {
+  var seg = e.target.closest ? e.target.closest('[data-set]') : null;
+  if (seg){
+    var path = seg.dataset.set, val = seg.dataset.val;
+    var numPaths = ['mKey','mBooking','mSign','splitA','capacityManual','tenure','stressAdd','price'];
+    setPath(state, path, numPaths.indexOf(path) >= 0 ? parseFloat(val) : val);
+    save(); buildSidebar(); render();
+    return;
+  }
+  var tab = e.target.closest ? e.target.closest('.tab') : null;
+  if (tab){
+    state.tab = tab.dataset.tab; save(); render();
+  }
+});
+$('#themeBtn').addEventListener('click', function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem(KEY + '-theme', next); } catch (e) {}
+  render();
+});
+$('#printBtn').addEventListener('click', function(){ window.print(); });
+$('#resetBtn').addEventListener('click', function(){
+  if (!window.confirm('Reset every input back to the defaults?')) return;
+  var tab = state.tab;
+  state = BTO.defaultState(); state.tab = tab;
+  save(); buildSidebar(); render();
+});
+
+/* init */
+try {
+  var th = localStorage.getItem(KEY + '-theme');
+  if (th) document.documentElement.setAttribute('data-theme', th);
+} catch (e) {}
+buildSidebar();
+render();
+})();
+</script>
+</body>
+</html>
