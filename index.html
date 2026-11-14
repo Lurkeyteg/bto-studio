@@ -1293,6 +1293,10 @@ document.addEventListener('change', function (e) {
   var el = e.target;
   if (el.tagName === 'SELECT' && el.dataset.bind){
     setPath(state, el.dataset.bind, el.value);
+    /* a bank loan can never be staggered — drop the schedule back to adult */
+    if (el.dataset.bind === 'loanType' && !BTO.PATHS[el.value].canSchedule && state.dpSchedule !== 'adult'){
+      state.dpSchedule = 'adult';
+    }
     save();
     var rebuild = ['loanType','grantMode','basis','dpSchedule'].indexOf(el.dataset.bind.split('.')[0]) >= 0 ||
       /\.(basis|citizenship)$/.test(el.dataset.bind);
