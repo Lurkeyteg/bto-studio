@@ -422,5 +422,38 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   });
 }
 
+/* ---------------- 15. funding vehicles (advisor-suite style) ---------------- */
+{
+  const s = base({ price: 550000, flatType: '4-room', loanType: 'hdb', saveRate: 0.0005, vehicle: 'bank', inflation: 0.03 });
+  const R = BTO.compute(s), S = R.saveup;
+
+  eq('funding: four vehicles listed', S.funding.length, 4);
+  eq('funding: order is bank, fd, endowment, portfolio',
+     S.funding.map(f => f.key).join(','), 'bank,fd,endowment,portfolio');
+  eq('funding: rates match the advisor-suite defaults',
+     S.funding.map(f => f.rate).join(','), '0.0005,0.015,0.0375,0.06');
+
+  /* real rate = (1 + nominal) / (1 + inflation) - 1 */
+  eq('funding: real rate of bank savings is -2.86%', S.funding[0].real, -0.0286, 0.0002);
+  eq('funding: real rate of the portfolio is 2.91%', S.funding[3].real, 0.0291, 0.0002);
+
+  /* a better vehicle needs less money each month for the same goal */
+  eq('funding: bank needs the most per month', S.funding[0].monthly > S.funding[1].monthly, true);
+  eq('funding: portfolio needs the least per month', S.funding[3].monthly < S.funding[2].monthly, true);
+  eq('funding: annual is twelve times monthly', Math.round(S.funding[3].annual), Math.round(S.funding[3].monthly * 12), 1);
+  eq('funding: the active rate drives the headline figure', Math.round(S.growth), Math.round(S.funding[0].monthly), 1);
+
+  /* switching vehicle changes the headline number */
+  const inPortfolio = BTO.compute(base({ price: 550000, flatType: '4-room', loanType: 'hdb', saveRate: 0.06, vehicle: 'portfolio' }));
+  eq('funding: portfolio rate lowers the monthly requirement',
+     inPortfolio.saveup.growth < S.growth, true);
+  eq('funding: portfolio row is marked active', inPortfolio.saveup.vehicle, 'portfolio');
+
+  /* a custom rate is not one of the four rows */
+  const custom = BTO.compute(base({ price: 550000, flatType: '4-room', loanType: 'hdb', saveRate: 0.03, vehicle: 'custom' }));
+  eq('funding: custom rate is labelled custom', custom.saveup.vehicle, 'custom');
+  eq('funding: custom rate still produces four comparison rows', custom.saveup.funding.length, 4);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

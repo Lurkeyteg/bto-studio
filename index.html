@@ -248,6 +248,13 @@ var SCHEDULES = {
   student: {sign:0.025, label:'Student / NSF (staggered)',   short:'2.5% + 22.5%',
             detail:'2.5% at signing, 22.5% at key collection — deferred income assessment'}
 };
+/* where the house deposit sits — the advisor's four funding vehicles (nominal) */
+var VEHICLES = {
+  bank:      { rate:0.000500, label:'Bank savings' },
+  fd:        { rate:0.015000, label:'Fixed deposit' },
+  endowment: { rate:0.037500, label:'Endowment' },
+  portfolio: { rate:0.060000, label:'Investment portfolio' }
+};
 
 function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
 function bandVal(bands, x, idx){
@@ -546,6 +553,18 @@ function computeCore(s){
     goalFV: goalFV, goalPlain: Math.max(0, surplus) * m4,
     monthsNeeded: monthsNeeded, achievable: achievable,
     saveRate: s.saveRate || 0, goalRate: s.goalRate || 0,
+    inflation: (s.inflation === undefined ? 0.03 : s.inflation),
+    vehicle: s.vehicle || 'custom',
+    /* the same goal funded from each vehicle — nominal and after inflation */
+    funding: Object.keys(VEHICLES).map(function(k){
+      var vr = VEHICLES[k].rate;
+      var amt = requiredParts(need3, m3, need4, m4, vr / 12).value;
+      return {
+        key: k, label: VEHICLES[k].label, rate: vr,
+        real: ((1 + vr) / (1 + (s.inflation === undefined ? 0.03 : s.inflation))) - 1,
+        monthly: amt, annual: amt * 12
+      };
+    }),
     immediate: stages[0].cash + stages[1].cash
   };
 
@@ -605,7 +624,7 @@ function defaultState(){
     grantMode:'auto', grantManual:0, otherGrant:0,
     loanType:'hdb', dpSchedule:'adult', rateHdb:0.026, rateBank:0.028, tenure:25, stressAdd:0.01,
     mBooking:2, mSign:8, mKey:36,
-    gst:1.09, oaRate:0.025, saveRate:0.03, goalRate:0.06,
+    gst:1.09, oaRate:0.025, saveRate:0.0005, goalRate:0.06, inflation:0.03, vehicle:'bank',
     salaryCeiling:8000, seCapAnnual:102000,
     hps:185, fireOverride:null, townCouncil:0,
     capacityMode:'auto', capacityManual:0, otherCommitments:1200,
@@ -626,7 +645,7 @@ return {
   cpfRates: cpfRates, monthlyOA: monthlyOA, monthlyTakeHome: monthlyTakeHome,
   ratiosFor: ratiosFor, defaultState: defaultState, PATHS: PATHS,
   EHG_TIERS: EHG_TIERS, RATE_TABLES: RATE_TABLES, OA_SHARE: OA_SHARE, CIT_LABEL: CIT_LABEL,
-  SCHEDULES: SCHEDULES
+  SCHEDULES: SCHEDULES, VEHICLES: VEHICLES
 };
 })();
 /* ==== BTO ENGINE END ==== */
@@ -662,6 +681,11 @@ function load(){
     if (o.loanType === 'hdb-staggered') { o.loanType = 'hdb'; o.dpSchedule = 'student'; }
     if (!BTO.PATHS[o.loanType]) o.loanType = 'hdb';
     if (!BTO.SCHEDULES[o.dpSchedule]) o.dpSchedule = 'adult';
+    /* repair an OA rate that was typed into a field showing a fraction (0.025
+       became 0.00025) — no CPF OA rate is below 0.5% */
+    if (typeof o.oaRate !== 'number' || o.oaRate < 0.005 || o.oaRate > 0.06) o.oaRate = d.oaRate;
+    if (!BTO.VEHICLES[o.vehicle]) o.vehicle = 'custom';
+    if (typeof o.inflation !== 'number') o.inflation = 0.03;
     return o;
   } catch (e) { return d; }
 }
@@ -782,7 +806,11 @@ function buildSidebar(){
   }
 
   h.push('<details class="grp" open><summary>Savings &amp; other goals</summary><div class="body">');
-  h.push(fNum('saveRate', 'Return on your savings', { suffix:'% / yr', step:0.5, min:0, pct:true }));
+  h.push(fSel('vehicle', 'Where the savings sit', [
+    ['bank','Bank savings'],['fd','Fixed deposit'],['endowment','Endowment'],
+    ['portfolio','Investment portfolio'],['custom','Custom rate']]));
+  h.push(fNum('saveRate', 'Rate on those savings', { suffix:'% / yr', step:0.05, min:0, pct:true }));
+  h.push(fNum('inflation', 'Inflation assumption', { suffix:'% / yr', step:0.5, min:0, pct:true }));
   h.push(fNum('goalRate', 'Return on other investments', { suffix:'% / yr', step:0.5, min:0, pct:true }));
   h.push(fSeg('capacityMode', 'Monthly cash available', [['auto','Auto'],['manual','Manual']]));
   if (s.capacityMode === 'manual') h.push(fNum('capacityManual', 'Set aside per month', { prefix:'$', step:100, min:0 }));
@@ -791,7 +819,7 @@ function buildSidebar(){
 
   h.push('<details class="grp"><summary>Advanced</summary><div class="body">');
   h.push(fNum('gst', 'GST multiplier', { step:0.01 }));
-  h.push(fNum('oaRate', 'CPF OA interest', { suffix:'% / yr', step:0.1 }));
+  h.push(fNum('oaRate', 'CPF OA interest', { suffix:'% / yr', step:0.1, pct:true }));
   h.push(fNum('salaryCeiling', 'CPF salary ceiling', { prefix:'$', suffix:'/mth', step:100 }));
   h.push(fNum('hps', 'HPS premium', { prefix:'$', step:5 }));
   h.push(fNum('townCouncil', 'Advanced town council fee', { prefix:'$', step:10 }));
@@ -997,8 +1025,10 @@ function viewSaveUp(R){
   var signPct = Math.round(R.signShare * 1000) / 10;
   var keyPct = Math.round((R.path.dp - R.signShare) * 1000) / 10;
   var basis = S.driver === 'signing'
-    ? who + ' · ' + fmt(S.need3) + ' first downpayment (' + signPct + '%) ÷ ' + S.m3 + ' months'
-    : who + ' · ' + fmt(S.need3 + S.need4) + ' total ÷ ' + S.m4 + ' months';
+    ? who + ' · ' + (S.vehicle === 'custom' ? pct(S.saveRate,2) : BTO.VEHICLES[S.vehicle].label.toLowerCase() + ' ' + pct(S.saveRate,2)) +
+      ' · ' + fmt(S.need3) + ' first downpayment (' + signPct + '%) ÷ ' + S.m3 + ' months'
+    : who + ' · ' + (S.vehicle === 'custom' ? pct(S.saveRate,2) : BTO.VEHICLES[S.vehicle].label.toLowerCase() + ' ' + pct(S.saveRate,2)) +
+      ' · ' + fmt(S.need3 + S.need4) + ' total ÷ ' + S.m4 + ' months';
   var afterLabel, afterLabelShort;
   if (S.afterSign < 0.5){ afterLabel = '$0 from month ' + (S.m3 + 1) + ' — CPF covers the ' + keyPct + '% at key'; }
   else if (Math.abs(S.afterSign - S.growth) < 1){ afterLabel = 'unchanged — the same rate runs to key collection'; }
@@ -1015,6 +1045,21 @@ function viewSaveUp(R){
     '<div class="legend"><span><i style="background:var(--gold)"></i>Cash required by each stage</span><span><i style="background:var(--accent)"></i>Your savings at the required rate</span></div>' +
     saveCurve(R) +
     '<div class="msg">' + saveUpStory(S, R) + '</div></div>');
+
+  /* the advisor-suite style card: the same goal funded four different ways */
+  out.push('<div class="card"><h3 class="h">Where the money sits</h3>' +
+    '<div class="mini" style="margin:-4px 0 10px">Same goal, different vehicle — what to set aside each month, and what that return is worth after inflation.</div>' +
+    '<table><tr><th>Vehicle</th><th>Nominal</th><th>Real</th><th>Per year</th><th>Per month</th></tr>');
+  S.funding.forEach(function(f){
+    out.push('<tr' + (f.key === S.vehicle ? ' class="tot"' : '') + '><td>' + f.label + '</td>' +
+      '<td>' + pct(f.rate, 2) + '</td><td>' + pct(f.real, 2) + '</td>' +
+      '<td>' + fmt(f.annual) + '</td><td>' + fmt(f.monthly) + '</td></tr>');
+  });
+  out.push('</table>' +
+    '<div class="msg">Illustration only — not advice and not a product recommendation. Nominal returns are deflated by the ' +
+    pct(S.inflation, 1) + ' inflation assumption, so the real column shows what the rate is worth after inflation. ' +
+    (S.vehicle === 'custom' ? 'Your custom rate of ' + pct(S.saveRate,2) + ' is the one driving the numbers above.' :
+      'The highlighted row is the vehicle driving the numbers above.') + '</div></div>');
 
   out.push('<div class="grid2">');
   out.push('<div class="card"><h3 class="h">What that leaves for other goals</h3>' +
@@ -1184,7 +1229,9 @@ function viewSummary(R){
   out.push('<div class="card"><h3 class="h">Assumptions on this page</h3><ul class="clean">' +
     '<li>Purchase price ' + fmt(R.totals.gross) + ', ' + R.s.flatType + ', grant ' + fmt(R.totals.grant) + ' (EHG ' + fmt(R.totals.ehgAuto) + (R.s.otherGrant ? ' + other ' + fmt(R.s.otherGrant) : '') + ').</li>' +
     '<li>Stamp duty ' + fmt(R.totals.bsd) + ' and legal ' + fmt(R.totals.legal) + ' computed on the price before grant.</li>' +
-    '<li>CPF OA grows ' + pct(R.s.oaRate,1) + ' a year; savings grow ' + pct(S.saveRate,1) + ' a year; other investments ' + pct(S.goalRate,1) + '.</li>' +
+    '<li>CPF OA grows ' + pct(R.s.oaRate,1) + ' a year; the house savings sit in ' +
+      (S.vehicle === 'custom' ? 'a custom vehicle at ' + pct(S.saveRate,2) : BTO.VEHICLES[S.vehicle].label.toLowerCase() + ' at ' + pct(S.saveRate,2)) +
+      '; other investments return ' + pct(S.goalRate,1) + '; inflation ' + pct(S.inflation,1) + '.</li>' +
     '<li>Key collection ' + R.s.mKey + ' months out, signing at ' + R.s.mSign + '. Downpayment ' + R.schedule.short +
       ' (' + R.schedule.label.toLowerCase() + '). HPS ' + fmt(R.s.hps) + ', fire insurance per flat type.</li>' +
     '<li>CPF at ' + R.perPerson.map(function(pp){ return esc(pp.name) + ' ' + pct(pp.cpfRate,1) + ' (' + (pp.cit === 'SC' ? 'citizen' : pp.citLabel) + ')'; }).join(', ') +
@@ -1284,6 +1331,12 @@ document.addEventListener('input', function (e) {
     val = el.value;
   }
   setPath(state, path, val);
+  if (path === 'saveRate'){
+    /* typing a rate means it is no longer one of the four standard vehicles */
+    state.vehicle = 'custom';
+    var vsel = document.querySelector('#side select[data-bind="vehicle"]');
+    if (vsel) vsel.value = 'custom';
+  }
   save();
   var rebuild = ['mode', 'loanType', 'grantMode', 'splitMode', 'capacityMode'].indexOf(path) >= 0;
   if (rebuild){ buildSidebar(); }
@@ -1297,8 +1350,12 @@ document.addEventListener('change', function (e) {
     if (el.dataset.bind === 'loanType' && !BTO.PATHS[el.value].canSchedule && state.dpSchedule !== 'adult'){
       state.dpSchedule = 'adult';
     }
+    /* picking a vehicle loads its rate; a custom rate leaves the number alone */
+    if (el.dataset.bind === 'vehicle' && el.value !== 'custom' && BTO.VEHICLES[el.value]){
+      state.saveRate = BTO.VEHICLES[el.value].rate;
+    }
     save();
-    var rebuild = ['loanType','grantMode','basis','dpSchedule'].indexOf(el.dataset.bind.split('.')[0]) >= 0 ||
+    var rebuild = ['loanType','grantMode','basis','dpSchedule','vehicle','capacityMode'].indexOf(el.dataset.bind.split('.')[0]) >= 0 ||
       /\.(basis|citizenship)$/.test(el.dataset.bind);
     if (rebuild) buildSidebar();
     schedule();

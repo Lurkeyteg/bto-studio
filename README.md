@@ -25,11 +25,11 @@ Files:
 | File | What it is |
 |---|---|
 | `index.html` | The whole app: engine (marked `BTO ENGINE START/END`), UI, styles |
-| `tests/engine.test.mjs` | 151 assertions run against the engine **extracted from `index.html`** |
+| `tests/engine.test.mjs` | 164 assertions run against the engine **extracted from `index.html`** |
 | `README.md` | This file |
 
 Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
-**151 passed, 0 failed**.
+**164 passed, 0 failed**.
 
 ## Sources
 
@@ -109,6 +109,10 @@ year) under graduated rates (G/G). Salary ceiling $8,000/month applies to all.
   is not citizenship-specific): 62.17% below 35, then 56.77 / 51.36 / 40.55 /
   35.3 / 14 / 6.07 / 8%.
 - OA grows at 2.5% a year with monthly contributions compounded to each stage.
+  Rate fields are entered **as a percentage** (2.5, not 0.025) — the app stores
+  the fraction and converts on both sides, so a typed "2.5" can never silently
+  become 0.025%. A stored OA rate below 0.5% is repaired on load, since no CPF OA
+  rate has ever been that low.
 - **CPF pays first, cash covers the rest**, but never more than the mandatory
   cash floor of the chosen route. Any CPF shortfall can be pooled from the
   partner's OA — the split page shows who lends and who draws — and whatever is
@@ -149,6 +153,22 @@ S2 = ( X4 − (S·F(m3) − X3)·(1+r)^(m4−m3) ) / F(m4−m3)
 Wiggle room = monthly cash available (take-home pay less other commitments)
 minus that saving requirement. The surplus is what stays free for other goals,
 and is projected forward at the investment rate to key collection.
+
+**Where the money sits** — the saving rate is not a single guess. The same goal
+is solved four times, once per funding vehicle, and the selected vehicle drives
+the headline requirement:
+
+| Vehicle | Nominal (default) | Real at 3% inflation |
+|---|---|---|
+| Bank savings | 0.05% | −2.86% |
+| Fixed deposit | 1.50% | −1.46% |
+| Endowment | 3.75% | 0.73% |
+| Investment portfolio | 6.00% | 2.91% |
+
+Real rate = `(1 + nominal) / (1 + inflation) − 1`. Rows show the requirement per
+month and per year, mirroring the Advisor Suite's "ways to close the gap" card;
+the chosen row is highlighted, and typing a rate of your own switches the
+selector to "Custom rate". All five rates plus inflation stay editable inputs.
 
 ## Assumptions and things to watch
 
