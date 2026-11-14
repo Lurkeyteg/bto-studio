@@ -696,6 +696,9 @@ function load(){
     });
     /* the stored rate always agrees with the vehicle it is meant to represent */
     if (o.vehicle !== 'custom' && BTO.VEHICLES[o.vehicle]) o.saveRate = BTO.vehRate(o, o.vehicle);
+    /* the timeline defaults moved to HDB's median (42 months booking → keys).
+       Carry an untouched old default forward; a deliberate custom timeline stays. */
+    if (o.mKey === 36 && o.mSign === 8) o.mKey = Math.max(1, o.mBooking || 1) + 42;
     return o;
   } catch (e) { return d; }
 }
