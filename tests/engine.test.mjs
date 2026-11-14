@@ -34,6 +34,9 @@ function base(over = {}) {
   s.grantMode = 'manual'; s.grantManual = 0; s.otherGrant = 0;
   s.people[0].oa = 0; s.people[1].oa = 0;
   s.otherCommitments = 0;
+  /* a test that pins saveRate means that rate, so opt out of the vehicle table
+     unless the test names a vehicle itself */
+  s.vehicle = 'custom';
   Object.assign(s, over);
   return s;
 }
@@ -436,6 +439,32 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   /* rates are quoted nominal — no inflation deflation in this view */
   eq('funding: rows carry no real-rate column', S.funding.some(f => 'real' in f), false);
   eq('funding: the bank row is quoted at 0.05% nominal', S.funding[0].rate, 0.0005);
+
+  /* every vehicle rate is an editable input, and the default is unchanged */
+  eq('vehicles: default bank return', BTO.defaultState().vehBank, 0.0005);
+  eq('vehicles: default fd return', BTO.defaultState().vehFd, 0.015);
+  eq('vehicles: default endowment return', BTO.defaultState().vehEndowment, 0.0375);
+  eq('vehicles: default portfolio return', BTO.defaultState().vehPortfolio, 0.06);
+
+  const edited = base({ price: 550000, flatType: '4-room', loanType: 'hdb',
+                        vehicle: 'bank', saveRate: 0.0005, vehBank: 0.02, vehPortfolio: 0.09 });
+  const E = BTO.compute(edited).saveup;
+  eq('vehicles: an edited bank return appears in the table', E.funding[0].rate, 0.02);
+  eq('vehicles: an edited portfolio return appears in the table', E.funding[3].rate, 0.09);
+  eq('vehicles: editing one vehicle leaves the others alone', E.funding[1].rate, 0.015);
+  eq('vehicles: a better edited bank rate lowers the requirement',
+     BTO.compute(edited).saveup.funding[0].monthly < S.funding[0].monthly, true);
+
+  /* the selected vehicle's rate is what drives the headline */
+  const driven = base({ price: 550000, flatType: '4-room', loanType: 'hdb', vehicle: 'endowment', vehEndowment: 0.05 });
+  const D = BTO.compute(driven).saveup;
+  eq('vehicles: the selected vehicle supplies the saving rate', BTO.vehRate(driven, 'endowment'), 0.05);
+  eq('vehicles: headline follows the edited selected vehicle',
+     Math.abs(D.growth - D.funding[2].monthly) < 1, true);
+
+  /* a broken stored rate falls back to the published default */
+  eq('vehicles: a nonsense rate falls back to the default',
+     BTO.vehRate(base({ vehFd: -3 }), 'fd'), 0.015);
 
   /* a better vehicle needs less money each month for the same goal */
   eq('funding: bank needs the most per month', S.funding[0].monthly > S.funding[1].monthly, true);

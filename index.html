@@ -248,13 +248,20 @@ var SCHEDULES = {
   student: {sign:0.025, label:'Student / NSF (staggered)',   short:'2.5% + 22.5%',
             detail:'2.5% at signing, 22.5% at key collection — deferred income assessment'}
 };
-/* where the house deposit sits — the advisor's four funding vehicles (nominal) */
+/* where the house deposit sits — the advisor's four funding vehicles.
+   The rates below are only the defaults; each one is editable in the sidebar. */
 var VEHICLES = {
   bank:      { rate:0.000500, label:'Bank savings' },
   fd:        { rate:0.015000, label:'Fixed deposit' },
   endowment: { rate:0.037500, label:'Endowment' },
   portfolio: { rate:0.060000, label:'Investment portfolio' }
 };
+var VEH_KEY = { bank:'vehBank', fd:'vehFd', endowment:'vehEndowment', portfolio:'vehPortfolio' };
+function vehRate(s, k){
+  var v = s && s[VEH_KEY[k]];
+  if (typeof v === 'number' && isFinite(v) && v >= 0 && v <= 0.5) return v;
+  return VEHICLES[k].rate;
+}
 
 function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
 function bandVal(bands, x, idx){
@@ -488,7 +495,9 @@ function computeCore(s){
   var need4 = stages[3].cash;
   var m3 = Math.max(1, stages[2].month);
   var m4 = Math.max(m3, stages[3].month);
-  var rs = (s.saveRate || 0) / 12;
+  /* the selected vehicle's own rate is what the plan is solved at */
+  var saveRateEff = (s.vehicle && s.vehicle !== 'custom' && VEHICLES[s.vehicle]) ? vehRate(s, s.vehicle) : (s.saveRate || 0);
+  var rs = saveRateEff / 12;
 
   function requiredParts(x3, a3, x4, a4, rr){
     var f4 = fvFactor(rr, a4);
@@ -552,11 +561,11 @@ function computeCore(s){
     keyOnlyMonthly: partsGrowth.main, signingOnlyMonthly: partsGrowth.early,
     goalFV: goalFV, goalPlain: Math.max(0, surplus) * m4,
     monthsNeeded: monthsNeeded, achievable: achievable,
-    saveRate: s.saveRate || 0, goalRate: s.goalRate || 0,
+    saveRate: saveRateEff, goalRate: s.goalRate || 0,
     vehicle: s.vehicle || 'custom',
     /* the same goal funded from each vehicle */
     funding: Object.keys(VEHICLES).map(function(k){
-      var vr = VEHICLES[k].rate;
+      var vr = vehRate(s, k);
       var amt = requiredParts(need3, m3, need4, m4, vr / 12).value;
       return { key: k, label: VEHICLES[k].label, rate: vr, monthly: amt, annual: amt * 12 };
     }),
@@ -620,6 +629,7 @@ function defaultState(){
     loanType:'hdb', dpSchedule:'adult', rateHdb:0.026, rateBank:0.028, tenure:25, stressAdd:0.01,
     mBooking:2, mSign:8, mKey:36,
     gst:1.09, oaRate:0.025, saveRate:0.0005, goalRate:0.06, vehicle:'bank',
+    vehBank:0.0005, vehFd:0.015, vehEndowment:0.0375, vehPortfolio:0.06,
     salaryCeiling:8000, seCapAnnual:102000,
     hps:185, fireOverride:null, townCouncil:0,
     capacityMode:'auto', capacityManual:0, otherCommitments:1200,
@@ -640,7 +650,7 @@ return {
   cpfRates: cpfRates, monthlyOA: monthlyOA, monthlyTakeHome: monthlyTakeHome,
   ratiosFor: ratiosFor, defaultState: defaultState, PATHS: PATHS,
   EHG_TIERS: EHG_TIERS, RATE_TABLES: RATE_TABLES, OA_SHARE: OA_SHARE, CIT_LABEL: CIT_LABEL,
-  SCHEDULES: SCHEDULES, VEHICLES: VEHICLES
+  SCHEDULES: SCHEDULES, VEHICLES: VEHICLES, VEH_KEY: VEH_KEY, vehRate: vehRate
 };
 })();
 /* ==== BTO ENGINE END ==== */
@@ -680,6 +690,12 @@ function load(){
        became 0.00025) — no CPF OA rate is below 0.5% */
     if (typeof o.oaRate !== 'number' || o.oaRate < 0.005 || o.oaRate > 0.06) o.oaRate = d.oaRate;
     if (!BTO.VEHICLES[o.vehicle]) o.vehicle = 'custom';
+    Object.keys(BTO.VEH_KEY).forEach(function(k){
+      var v = o[BTO.VEH_KEY[k]];
+      if (typeof v !== 'number' || !isFinite(v) || v < 0 || v > 0.5) o[BTO.VEH_KEY[k]] = BTO.VEHICLES[k].rate;
+    });
+    /* the stored rate always agrees with the vehicle it is meant to represent */
+    if (o.vehicle !== 'custom' && BTO.VEHICLES[o.vehicle]) o.saveRate = BTO.vehRate(o, o.vehicle);
     return o;
   } catch (e) { return d; }
 }
@@ -702,7 +718,7 @@ function fNum(path, label, opts){
   if (v === null || v === undefined) v = '';
   return '<div class="field"><label>' + label + '</label><div class="inp">' +
     (opts.prefix ? '<span class="pfx">' + opts.prefix + '</span>' : '') +
-    '<input type="number" data-bind="' + path + '" value="' + v + '"' +
+    '<input type="number" data-bind="' + path + '"' + (opts.pct ? ' data-pct="1"' : '') + ' value="' + v + '"' +
     (opts.step ? ' step="' + opts.step + '"' : '') +
     (opts.min !== undefined ? ' min="' + opts.min + '"' : '') +
     (opts.max !== undefined ? ' max="' + opts.max + '"' : '') + '>' +
@@ -803,7 +819,18 @@ function buildSidebar(){
   h.push(fSel('vehicle', 'Where the savings sit', [
     ['bank','Bank savings'],['fd','Fixed deposit'],['endowment','Endowment'],
     ['portfolio','Investment portfolio'],['custom','Custom rate']]));
-  h.push(fNum('saveRate', 'Rate on those savings', { suffix:'% / yr', step:0.05, min:0, pct:true }));
+  if (s.vehicle === 'custom'){
+    h.push(fNum('saveRate', 'Custom rate on those savings', { suffix:'% / yr', step:0.05, min:0, pct:true }));
+  }
+  h.push('<div class="mini" style="margin:12px 0 2px;color:var(--fg);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:10.5px">Returns used in this table</div>');
+  h.push(fNum('vehBank', 'Bank savings return', { suffix:'%', step:0.05, min:0, pct:true }));
+  h.push(fNum('vehFd', 'Fixed deposit return', { suffix:'%', step:0.05, min:0, pct:true }));
+  h.push(fNum('vehEndowment', 'Endowment return', { suffix:'%', step:0.05, min:0, pct:true }));
+  h.push(fNum('vehPortfolio', 'Investment portfolio return', { suffix:'%', step:0.05, min:0, pct:true }));
+  if (s.vehicle !== 'custom'){
+    h.push('<div class="mini" style="margin-top:6px">The plan is solved at the ' +
+      BTO.VEHICLES[s.vehicle].label.toLowerCase() + ' return above.</div>');
+  }
   h.push(fNum('goalRate', 'Return on other investments', { suffix:'% / yr', step:0.5, min:0, pct:true }));
   h.push(fSeg('capacityMode', 'Monthly cash available', [['auto','Auto'],['manual','Manual']]));
   if (s.capacityMode === 'manual') h.push(fNum('capacityManual', 'Set aside per month', { prefix:'$', step:100, min:0 }));
@@ -1315,8 +1342,8 @@ document.addEventListener('input', function (e) {
   var val;
   if (el.type === 'number'){
     val = el.value === '' ? null : parseFloat(el.value);
-    if (path === 'rateHdb' || path === 'rateBank' || path === 'saveRate' || path === 'goalRate' ||
-        path === 'oaRate' || path === 'stressAdd') val = (val === null ? 0 : val) / 100;
+    /* any field built with pct:true is typed as a percentage and stored as a fraction */
+    if (el.dataset.pct) val = (val === null || isNaN(val) ? 0 : val) / 100;
   } else if (el.type === 'checkbox'){
     val = el.checked;
   } else {
@@ -1329,6 +1356,9 @@ document.addEventListener('input', function (e) {
     var vsel = document.querySelector('#side select[data-bind="vehicle"]');
     if (vsel) vsel.value = 'custom';
   }
+  /* editing the selected vehicle's own return drives the headline rate */
+  var vehKey = Object.keys(BTO.VEH_KEY).filter(function(k){ return BTO.VEH_KEY[k] === path; })[0];
+  if (vehKey && state.vehicle === vehKey) state.saveRate = val;
   save();
   var rebuild = ['mode', 'loanType', 'grantMode', 'splitMode', 'capacityMode'].indexOf(path) >= 0;
   if (rebuild){ buildSidebar(); }
@@ -1342,9 +1372,9 @@ document.addEventListener('change', function (e) {
     if (el.dataset.bind === 'loanType' && !BTO.PATHS[el.value].canSchedule && state.dpSchedule !== 'adult'){
       state.dpSchedule = 'adult';
     }
-    /* picking a vehicle loads its rate; a custom rate leaves the number alone */
+    /* picking a vehicle loads that vehicle's own (editable) rate */
     if (el.dataset.bind === 'vehicle' && el.value !== 'custom' && BTO.VEHICLES[el.value]){
-      state.saveRate = BTO.VEHICLES[el.value].rate;
+      state.saveRate = BTO.vehRate(state, el.value);
     }
     save();
     var rebuild = ['loanType','grantMode','basis','dpSchedule','vehicle','capacityMode'].indexOf(el.dataset.bind.split('.')[0]) >= 0 ||

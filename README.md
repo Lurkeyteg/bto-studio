@@ -25,11 +25,11 @@ Files:
 | File | What it is |
 |---|---|
 | `index.html` | The whole app: engine (marked `BTO ENGINE START/END`), UI, styles |
-| `tests/engine.test.mjs` | 164 assertions run against the engine **extracted from `index.html`** |
+| `tests/engine.test.mjs` | 175 assertions run against the engine **extracted from `index.html`** |
 | `README.md` | This file |
 
 Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
-**164 passed, 0 failed**.
+**175 passed, 0 failed**.
 
 ## Sources
 
@@ -166,10 +166,14 @@ the headline requirement:
 | Investment portfolio | 6.00% |
 
 Each row shows the requirement per month and per year, mirroring the Advisor
-Suite's "ways to close the gap" card; the chosen row is highlighted, and typing a
-rate of your own switches the selector to "Custom rate". Rates are quoted
-nominal — there is no inflation deflation on this card. All four rates stay
-editable inputs.
+Suite's "ways to close the gap" card; the chosen row is highlighted. **Every one
+of the four returns is an editable input** ("Returns used in this table" in the
+sidebar) and the defaults above are what a fresh session starts from. The plan is
+always solved at the *selected* vehicle's return, so editing the bank return
+while bank savings is selected moves the headline figure and the whole chart —
+editing a vehicle you are not using only changes that row. Choose "Custom rate"
+to solve at a number that belongs to none of the four. Rates are quoted nominal —
+there is no inflation deflation anywhere in this app.
 
 ## Assumptions and things to watch
 
