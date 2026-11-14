@@ -25,11 +25,11 @@ Files:
 | File | What it is |
 |---|---|
 | `index.html` | The whole app: engine (marked `BTO ENGINE START/END`), UI, styles |
-| `tests/engine.test.mjs` | 135 assertions run against the engine **extracted from `index.html`** |
+| `tests/engine.test.mjs` | 151 assertions run against the engine **extracted from `index.html`** |
 | `README.md` | This file |
 
 Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
-**135 passed, 0 failed**.
+**151 passed, 0 failed**.
 
 ## Sources
 
@@ -56,17 +56,23 @@ Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
 |---|---|---|
 | 1 Application | at launch | $10, cash |
 | 2 Booking | unit selection | option fee $500 (2-room) / $1,000 (3-room) / $2,000 (4-room+), cash, credited to the downpayment |
-| 3 Agreement for lease | ~8 months (input) | downpayment share less option fee, buyer stamp duty, legal fee |
-| 4 Key collection | ~36 months (input) | remaining downpayment, survey, lease + mortgage in-escrow fees, stamp duty on deed of assignment, HPS, fire insurance (+ optional town-council advance) |
+| 3 Agreement for lease | ~8 months (input) | **first** downpayment share (5% or 2.5% of the price) less the option fee, buyer stamp duty, legal fee |
+| 4 Key collection | ~36 months (input) | **balance** downpayment (20% or 22.5%), survey, lease + mortgage in-escrow fees, stamp duty on deed of assignment, HPS, fire insurance (+ optional town-council advance) |
 
-**Financing routes** (total downpayment / due at signing / mandatory cash)
+**Downpayment schedule** — chosen in the fact find, separate from the lender
 
-| Route | Total DP | At signing | Mandatory cash |
+| Applicants | At signing | At key collection | Notes |
 |---|---|---|---|
-| HDB loan | 25% | 10% less option fee | none — all CPF-eligible |
-| HDB staggered | 25% | 5% less option fee | none |
-| Bank loan 75% LTV | 25% | 20% less option fee | 5% of price |
-| Bank loan 55% LTV | 45% | 45% less option fee | 10% of price |
+| Adults | 5% of price, less option fee | 20% | whole 25% can be CPF on an HDB loan |
+| Student / NSF (staggered, DIA) | 2.5%, less option fee | 22.5% | deferred income assessment; couples only, HDB loans only |
+
+**Financing routes** (total downpayment / cash floor at signing)
+
+| Route | Total DP | Cash floor | Schedule |
+|---|---|---|---|
+| HDB loan | 25% | none — all CPF-eligible | adult or staggered |
+| Bank loan 75% LTV | 25% | 5% of price in cash | adult only |
+| Bank loan 55% LTV | 45% | 10% of price in cash | all at signing |
 
 **Fees**
 
@@ -173,8 +179,8 @@ and is projected forward at the investment rate to key collection.
   and HDB's published rules use **10% at signing and 15% at key collection**
   (or 5% / 20% staggered), which is what this app models. `Calculation for
   DPSavings` in the same workbook agrees with 5% / 20%. The 2.5% / 22.5% split is
-  the **deferred income assessment (DIA)** variant used when a first-timer couple
-  includes a student/NSF — not yet a route in this app.
+  the **deferred income assessment (DIA)** variant and is now its own schedule in
+  the fact find (Student / NSF), alongside the standard adult 5% / 20% split.
 
 ## Deviation log
 

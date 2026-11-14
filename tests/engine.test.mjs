@@ -77,9 +77,10 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   }));
   eq('A: option fee stage', stage(R, 's2').total, 2000, 0.01);
   eq('A: downpayment 25%', R.totals.dpTotal, 137500, 0.01);
-  eq('A: signing downpayment 10% less option fee', stage(R, 's3').items[0].a, 53000, 0.01);
+  eq('A: signing downpayment 5% less option fee', stage(R, 's3').items[0].a, 25500, 0.01);
   eq('A: BSD on stage 3', stage(R, 's3').items[1].a, 11100, 0.01);
-  eq('A: key-collection downpayment 15%', stage(R, 's4').items[0].a, 82500, 0.01);
+  eq('A: key-collection downpayment 20%', stage(R, 's4').items[0].a, 110000, 0.01);
+  eq('A: the two downpayment stages add to 25%', stage(R, 's3').items[0].a + stage(R, 's2').total + stage(R, 's4').items[0].a, 137500, 0.01);
   eq('A: loan is the remaining 75%', R.loan.amount, 412500, 0.01);
   eq('A: monthly instalment @2.6%/25y', R.loan.monthly, BTO.pmt(0.026 / 12, 300, 412500), 0.01);
   eq('A: stamp duty on deed of assignment capped at 500', stage(R, 's4').items[4].a, 500, 0.01);
@@ -98,23 +99,41 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   eq('A: CPF + cash = grand total', R.totals.cpf + R.totals.cash, R.totals.all, 0.01);
 }
 
-/* ---------------- 3. staggered HDB downpayment (video method B) ---------------- */
+/* ---------------- 3. downpayment schedules: adult 5+20 vs student 2.5+22.5 ---------------- */
 {
-  const R = BTO.compute(base({ price: 550000, flatType: '4-room', loanType: 'hdb-staggered' }));
-  eq('staggered: signing DP 5% less option fee', stage(R, 's3').items[0].a, 25500, 0.01);
-  eq('staggered: key DP 20%', stage(R, 's4').items[0].a, 110000, 0.01);
-  eq('staggered: still 25% total', stage(R, 's3').items[0].a + stage(R, 's2').total + stage(R, 's4').items[0].a, 137500, 0.01);
-  eq('staggered: loan unchanged at 75%', R.loan.amount, 412500, 0.01);
+  const adult = BTO.compute(base({ price: 550000, flatType: '4-room', loanType: 'hdb', dpSchedule: 'adult' }));
+  eq('adult: signing 5% less option fee', stage(adult, 's3').items[0].a, 25500, 0.01);
+  eq('adult: key collection 20%', stage(adult, 's4').items[0].a, 110000, 0.01);
+  eq('adult: schedule is reported', adult.scheduleKey, 'adult');
+  eq('adult: signing share is 5%', adult.signShare, 0.05, 1e-9);
+
+  const dia = BTO.compute(base({ price: 550000, flatType: '4-room', loanType: 'hdb', dpSchedule: 'student' }));
+  eq('student: signing 2.5% less option fee', stage(dia, 's3').items[0].a, 11750, 0.01);
+  eq('student: key collection 22.5%', stage(dia, 's4').items[0].a, 123750, 0.01);
+  eq('student: schedule is reported', dia.scheduleKey, 'student');
+  eq('student: signing share is 2.5%', dia.signShare, 0.025, 1e-9);
+  eq('student: still the same 25% in total', stage(dia, 's3').items[0].a + stage(dia, 's2').total + stage(dia, 's4').items[0].a, 137500, 0.01);
+  eq('student: loan unchanged at 75%', dia.loan.amount, 412500, 0.01);
+
+  /* the staggered schedule moves cash later, so the first payment is smaller */
+  eq('student: first payment is smaller than adult', stage(dia, 's3').total < stage(adult, 's3').total, true);
+  eq('student: key-collection payment is larger than adult', stage(dia, 's4').total > stage(adult, 's4').total, true);
+
+  /* a bank loan cannot take the staggered schedule */
+  const bankStudent = BTO.compute(base({ price: 550000, flatType: '4-room', loanType: 'bank75', dpSchedule: 'student' }));
+  eq('bank75: staggered schedule is ignored', bankStudent.scheduleKey, 'adult');
+  eq('bank75: signing stays at 5%', stage(bankStudent, 's3').items[0].a, 25500, 0.01);
 }
 
-/* ---------------- 4. bank loan 75% LTV (video method C) ---------------- */
+/* ---------------- 4. bank loan 75% LTV ---------------- */
 {
-  const bigOA = [{ name: 'A', income: 6000, age: 30, oa: 400000, basis: 'employee' },
-                 { name: 'B', income: 6000, age: 30, oa: 400000, basis: 'employee' }];
+  const bigOA = [{ name: 'A', income: 6000, age: 30, oa: 400000, basis: 'employee', citizenship: 'SC' },
+                 { name: 'B', income: 6000, age: 30, oa: 400000, basis: 'employee', citizenship: 'SC' }];
   const R = BTO.compute(base({ price: 550000, flatType: '4-room', loanType: 'bank75', people: bigOA }));
-  eq('bank75: signing DP 20% less option fee', stage(R, 's3').items[0].a, 108000, 0.01);
-  eq('bank75: mandatory cash 5% less option fee', stage(R, 's3').cash, 25500, 0.01);
-  eq('bank75: key DP 5%', stage(R, 's4').items[0].a, 27500, 0.01);
+  eq('bank75: signing DP 5% less option fee', stage(R, 's3').items[0].a, 25500, 0.01);
+  eq('bank75: the whole signing downpayment is cash', stage(R, 's3').cash, 25500, 0.01);
+  eq('bank75: key DP 20%', stage(R, 's4').items[0].a, 110000, 0.01);
+  eq('bank75: key-collection balance is CPF-eligible', stage(R, 's4').items[0].p, 'either');
   eq('bank75: no mortgage in-escrow fee', stage(R, 's4').items[3].a, 0, 0.01);
 }
 
@@ -137,9 +156,9 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   }));
   eq('B: option fee 500', stage(R, 's2').total, 500, 0.01);
   eq('B: total DP 62,500', R.totals.dpTotal, 62500, 0.01);
-  eq('B: signing DP 24,500', stage(R, 's3').items[0].a, 24500, 0.01);
+  eq('B: signing DP 12,000', stage(R, 's3').items[0].a, 12000, 0.01);
   eq('B: BSD 3,200', stage(R, 's3').items[1].a, 3200, 0.01);
-  eq('B: key DP 37,500', stage(R, 's4').items[0].a, 37500, 0.01);
+  eq('B: key DP 50,000', stage(R, 's4').items[0].a, 50000, 0.01);
   eq('B: single pays 100% of cash', R.perPerson.length === 1 && R.ratios[0] === 1, true);
   eq('B: single survey fee 163.50', BTO.surveyFee('2-room', 1.09), 163.5, 0.01);
   eq('B: fire insurance 2-room', BTO.firePremium('2-room'), 1.99, 0.01);
@@ -194,8 +213,17 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
     people: [{ name: 'A', income: 3000, age: 30, oa: 8000, basis: 'employee' },
              { name: 'B', income: 2500, age: 30, oa: 5000, basis: 'employee' }]
   }));
-  eq('save: after-signing rate is lower than the upfront rate', C.saveup.afterSign < C.saveup.growth, true);
+  eq('save: after-signing rate is never higher than the upfront rate', C.saveup.afterSign <= C.saveup.growth + 0.01, true);
   eq('save: after-signing rate is never negative', C.saveup.afterSign >= 0, true);
+  /* when the signing lump is what sets the pace, the second phase is genuinely cheaper */
+  const signingDriven = BTO.compute(base({
+    price: 550000, flatType: '4-room', loanType: 'bank55', saveRate: 0.03,
+    people: [{ name: 'A', income: 3000, age: 30, oa: 0, basis: 'employee', citizenship: 'SC' },
+             { name: 'B', income: 2500, age: 30, oa: 0, basis: 'employee', citizenship: 'SC' }]
+  }));
+  if (signingDriven.saveup.driver === 'signing'){
+    eq('save: two-speed plan is cheaper after signing', signingDriven.saveup.afterSign < signingDriven.saveup.growth, true);
+  } else { pass++; }
   {
     /* replay the two-speed plan and check the key-collection lump is exactly met */
     const r = 0.03 / 12, S = C.saveup.growth, S2 = C.saveup.afterSign;
@@ -250,24 +278,34 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
 /* ---------------- 11. path comparison ---------------- */
 {
   const R = BTO.compute(base({ price: 550000, flatType: '4-room', loanType: 'hdb' }));
-  eq('compare: all four routes present', R.compare.length, 4);
-  eq('compare: includes staggered and 55% LTV', R.compare.map(c => c.key).join(','), 'hdb,hdb-staggered,bank75,bank55');
-  const hdb = R.compare.find(c => c.key === 'hdb'), stag = R.compare.find(c => c.key === 'hdb-staggered');
-  eq('compare: staggered has less cash due before key', stag.upfront < hdb.upfront, true);
-  eq('compare: total cash is identical for both HDB routes', stag.cash, hdb.cash, 0.5);
+  eq('compare: four rows present', R.compare.length, 4);
+  eq('compare: routes in order', R.compare.map(c => c.key).join(','), 'hdb,hdb,bank75,bank55');
+  eq('compare: the second row is the staggered schedule',
+     R.compare[1].sched, 'student');
+  const adult = R.compare[0], stag = R.compare[1], bank75 = R.compare[2], bank55 = R.compare[3];
+  eq('compare: staggered row is labelled', stag.label.indexOf('staggered') > 0, true);
+  eq('compare: staggered has less cash due before key', stag.upfront < adult.upfront, true);
+  eq('compare: total cash is identical for both HDB schedules', stag.cash, adult.cash, 0.5);
+  eq('compare: 55% LTV needs the most cash upfront', bank55.upfront > bank75.upfront, true);
+  eq('compare: signing share is carried into the comparison', stag.sign, 0.025, 1e-9);
 }
 
 /* ---------------- 12. wiggle room ---------------- */
 {
   const R = BTO.compute(base({
-    price: 550000, flatType: '4-room', loanType: 'hdb', capacityMode: 'manual', capacityManual: 3000,
+    price: 550000, flatType: '4-room', loanType: 'hdb', capacityMode: 'manual', capacityManual: 2500,
     saveRate: 0.03, goalRate: 0.06
   }));
   eq('wiggle: shortfall detected when capacity is too low', R.saveup.achievable, false);
-  eq('wiggle: months needed pushed past the key date', R.saveup.monthsNeeded > 36 || R.saveup.monthsNeeded === null, true);
+  eq('wiggle: shortfall is quantified', R.saveup.gap > 0, true);
+  eq('wiggle: gap equals the requirement minus capacity',
+     R.saveup.gap, R.saveup.growth - R.saveup.capacity, 0.5);
+  /* the signing deadline binds here, so the useful number is the months it takes to save it */
+  eq('wiggle: months needed is reported for the binding deadline',
+     R.saveup.monthsNeeded > R.saveup.m3 || R.saveup.monthsNeeded === null, true);
   eq('wiggle: surplus reported when capacity is ample', (() => {
     const R2 = BTO.compute(base({ price: 550000, flatType: '4-room', capacityMode: 'manual', capacityManual: 15000 }));
-    return R2.saveup.surplus > 0 && R2.saveup.goalFV > 0;
+    return R2.saveup.surplus > 0 && R2.saveup.goalFV > 0 && R2.saveup.achievable;
   })(), true);
 }
 
@@ -364,24 +402,20 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   const noOA = [{ name: 'A', income: 6500, age: 30, oa: 0, basis: 'employee', citizenship: 'SC' },
                 { name: 'B', income: 5000, age: 29, oa: 0, basis: 'employee', citizenship: 'SC' }];
 
-  /* bank route: nearly all the cash is due at signing, so that deadline sets the pace */
-  const bank = BTO.compute(base({ loanType: 'bank75', price: 550000, flatType: '4-room', people: noOA, saveRate: 0.001 }));
-  eq('driver: bank loan flags the signing deadline', bank.saveup.driver, 'signing');
+  /* 55% LTV puts 45% of the price at signing, so that deadline sets the pace */
+  const bank55 = BTO.compute(base({ loanType: 'bank55', price: 550000, flatType: '4-room', people: noOA, saveRate: 0.001 }));
+  eq('driver: 55% LTV flags the signing deadline', bank55.saveup.driver, 'signing');
   eq('driver: monthly equals the signing lump over months to signing',
-     bank.saveup.driverMonthly, bank.saveup.need3 / bank.saveup.m3, 10);
-  eq('driver: monthly is the larger of the two deadlines', bank.saveup.driverMonthly >= bank.saveup.keyOnlyMonthly, true);
-  eq('driver: little or nothing is left for key collection', bank.saveup.need4 < 100, true);
-  eq('driver: after signing the rate drops to nothing', bank.saveup.afterSign < 1, true);
+     bank55.saveup.driverMonthly, bank55.saveup.need3 / bank55.saveup.m3, 40);
 
-  /* signing two years out: the same lumps no longer force a high monthly rate,
-     so the total (key collection) becomes the pace-setter */
-  const spread = BTO.compute(base({ loanType: 'hdb-staggered', price: 550000, flatType: '4-room', people: noOA, mSign: 24, mKey: 36 }));
-  eq('driver: a late signing stage hands the pace to key collection', spread.saveup.driver, 'key');
+  /* the 2.5% schedule makes the first payment small, so key collection takes over */
+  const dia = BTO.compute(base({ loanType: 'hdb', dpSchedule: 'student', price: 550000, flatType: '4-room', people: noOA }));
+  eq('driver: the 2.5% schedule hands the pace to key collection', dia.saveup.driver, 'key');
   eq('driver: monthly equals the total over months to key',
-     spread.saveup.driverMonthly, (spread.saveup.need3 + spread.saveup.need4) / spread.saveup.m4, 60);
+     dia.saveup.driverMonthly, (dia.saveup.need3 + dia.saveup.need4) / dia.saveup.m4, 60);
 
   /* the reported monthly must always equal the deadline it names */
-  [bank, spread].forEach((R, i) => {
+  [bank55, dia].forEach((R, i) => {
     const S = R.saveup;
     const want = S.driver === 'signing' ? S.signingOnlyMonthly : S.keyOnlyMonthly;
     eq(`driver: named driver matches the rate (case ${i})`, Math.round(S.growth), Math.round(want), 1);

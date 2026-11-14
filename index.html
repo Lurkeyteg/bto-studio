@@ -231,12 +231,22 @@ var CIT_LABEL = { SC:'Singapore Citizen', PR1:'PR — 1st year', PR2:'PR — 2nd
  * Source: CPF Board allocation table (Table 6) */
 var OA_SHARE = [[35,0.6217],[45,0.5677],[50,0.5136],[55,0.4055],[60,0.353],[65,0.14],[70,0.0607],[999,0.08]];
 
-/* financing paths: total downpayment, share at agreement-for-lease, mandatory-cash share */
+/* financing paths: total downpayment + the cash floor MAS imposes at signing.
+ * The signing/key SPLIT is a separate choice (dpSchedule) because it depends on
+ * whether the applicants are adults or a student/NSF couple, not on the lender. */
 var PATHS = {
-  'hdb':           {dp:0.25, sign:0.10, cashMin:0.00, rateKey:'rateHdb',  label:'HDB loan'},
-  'hdb-staggered': {dp:0.25, sign:0.05, cashMin:0.00, rateKey:'rateHdb',  label:'HDB loan (staggered)'},
-  'bank75':        {dp:0.25, sign:0.20, cashMin:0.05, rateKey:'rateBank', label:'Bank loan (75% LTV)'},
-  'bank55':        {dp:0.45, sign:0.45, cashMin:0.10, rateKey:'rateBank', label:'Bank loan (55% LTV)'}
+  'hdb':    {dp:0.25, cashMin:0.00, rateKey:'rateHdb',  label:'HDB loan',            canSchedule:true},
+  'bank75': {dp:0.25, cashMin:0.05, rateKey:'rateBank', label:'Bank loan (75% LTV)', canSchedule:false},
+  'bank55': {dp:0.45, cashMin:0.10, rateKey:'rateBank', label:'Bank loan (55% LTV)', canSchedule:false}
+};
+/* how the 25% downpayment is timed. Adult applications pay 5% now and 20% at key
+ * collection; a student/NSF couple on the deferred income assessment (DIA) pays
+ * 2.5% now and 22.5% at key collection. */
+var SCHEDULES = {
+  adult:   {sign:0.05,  label:'Adult applicants',            short:'5% + 20%',
+            detail:'5% at signing of the lease, 20% at key collection'},
+  student: {sign:0.025, label:'Student / NSF (staggered)',   short:'2.5% + 22.5%',
+            detail:'2.5% at signing, 22.5% at key collection — deferred income assessment'}
 };
 
 function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
@@ -338,8 +348,13 @@ function computeCore(s){
 
   var of = optionFee(s.flatType);
   var dpTotal = net * path.dp;
-  var dp3 = Math.max(0, net * path.sign - of);
-  var dp4 = Math.max(0, dpTotal - net * path.sign);
+  /* which schedule applies: only an HDB loan can be staggered; a bank loan always
+     takes the adult split (the 5% cash floor is due at signing either way) */
+  var schedKey = (path.canSchedule && s.dpSchedule === 'student') ? 'student' : 'adult';
+  var sched = SCHEDULES[schedKey];
+  var signShare = (path.dp === 0.45) ? 0.45 : sched.sign;   /* 55% LTV pays all at signing */
+  var dp3 = Math.max(0, net * signShare - of);
+  var dp4 = Math.max(0, dpTotal - net * signShare);
   var bsdAmt = bsd(gross);
   var legal = legalFee(gross, s.gst || 1.09);
   var svy = surveyFee(s.flatType, s.gst || 1.09);
@@ -347,7 +362,7 @@ function computeCore(s){
     ? firePremium(s.flatType) : s.fireOverride;
   var loanAmt = Math.max(0, net - dpTotal);
   var aod = Math.min(loanAmt * 0.004, 500);
-  var isHdb = (s.loanType === 'hdb' || s.loanType === 'hdb-staggered');
+  var isHdb = (s.loanType === 'hdb');
   var mortReg = isHdb ? MORT_REG : 0;
   var cashMin3 = Math.max(0, net * path.cashMin - of);
 
@@ -358,13 +373,14 @@ function computeCore(s){
       items:[{n:'Option fee', a:of, p:'cash', note:'NETS / cashier\u2019s order — credited to your downpayment'}], cashMin:0 },
     { key:'s3', label:'3 · Agreement for lease', when:'~' + s.mSign + ' months out', month:Math.max(1, s.mSign),
       items:[
-        {n:'Downpayment (' + Math.round(path.sign*100) + '% less option fee)', a:dp3, p:'either', note:'CPF OA, cash or grant'},
+        {n:'First downpayment (' + Math.round(signShare*1000)/10 + '% less option fee)', a:dp3, p:'either',
+         note: schedKey === 'student' ? 'DIA — student/NSF schedule' : 'CPF OA, cash or grant'},
         {n:'Buyer stamp duty', a:bsdAmt, p:'either', note:'computed on price before grant'},
         {n:'Legal / conveyancing fee', a:legal, p:'either', note:'HDB scale, incl. GST'}
       ], cashMin:cashMin3 },
     { key:'s4', label:'4 · Key collection', when:'~' + s.mKey + ' months out', month:Math.max(2, s.mKey),
       items:[
-        {n:'Downpayment balance (' + Math.round((dp4 / (net || 1)) * 100) + '% of price)', a:dp4, p:'either', note:''},
+        {n:'Downpayment balance (' + Math.round((dp4 / (net || 1)) * 1000)/10 + '% of price)', a:dp4, p:'either', note:''},
         {n:'Survey fee', a:svy, p:'either', note:''},
         {n:'Lease in-escrow registration', a:LEASE_REG, p:'either', note:'fixed'},
         {n:'Mortgage in-escrow registration', a:mortReg, p:'either', note:isHdb ? 'HDB loan only' : 'not applicable'},
@@ -490,11 +506,23 @@ function computeCore(s){
     : Math.max(0, takeHome - (s.otherCommitments || 0));
   var surplus = capacity - sGrowth;
 
-  var monthsNeeded = m4, achievable = true;
+  /* affordability of the plan: when the signing lump binds, the useful lever is how
+     long it takes to save it at the client's capacity — not the key-collection date */
+  var monthsNeeded = m4, achievable = true, signingMonthsNeeded = null, gap = Math.max(0, sGrowth - capacity);
   if (sGrowth > capacity + 0.5){
-    achievable = false; monthsNeeded = null;
-    for (var t = m4; t <= 360; t++){
-      if (requiredMonthly(need3, m3, need4, t, rs) <= capacity){ monthsNeeded = t; break; }
+    achievable = false;
+    if (capacity > 0){
+      for (var n1 = 1; n1 <= 360; n1++){
+        if (capacity * fvFactor(rs, n1) >= need3){ signingMonthsNeeded = n1; break; }
+      }
+    }
+    if (driver === 'signing'){
+      monthsNeeded = signingMonthsNeeded;          /* the signing date is the binding one */
+    } else {
+      monthsNeeded = null;
+      for (var t = m4; t <= 360; t++){
+        if (requiredMonthly(need3, m3, need4, t, rs) <= capacity){ monthsNeeded = t; break; }
+      }
     }
   }
   var goalFV = surplus > 0 ? surplus * fvFactor((s.goalRate || 0)/12, m4) : 0;
@@ -513,6 +541,7 @@ function computeCore(s){
     plain: sPlain, growth: sGrowth, capacity: capacity, surplus: surplus,
     ahead: ahead, afterSign: afterSign,
     driver: driver, driverMonthly: driverMonthly,
+    signingMonthsNeeded: signingMonthsNeeded, gap: gap,
     keyOnlyMonthly: partsGrowth.main, signingOnlyMonthly: partsGrowth.early,
     goalFV: goalFV, goalPlain: Math.max(0, surplus) * m4,
     monthsNeeded: monthsNeeded, achievable: achievable,
@@ -522,6 +551,7 @@ function computeCore(s){
 
   return {
     s: s, single: single, people: people, ratios: ratios, path: path,
+    schedule: sched, scheduleKey: schedKey, signShare: signShare,
     incomeTotal: incomeTotal, takeHome: takeHome,
     stages: stages, totals: totals, loan: loan, saveup: saveup,
     perPerson: people.map(function(p, i){
@@ -545,15 +575,25 @@ function computeCore(s){
 
 function compute(s){
   var R = computeCore(s);
-  R.compare = Object.keys(PATHS).map(function(k){
+  /* compare the three financing routes, plus the staggered schedule on the HDB loan */
+  var rows = [
+    { key:'hdb', sched:'adult' },
+    { key:'hdb', sched:'student' },
+    { key:'bank75', sched:'adult' },
+    { key:'bank55', sched:'adult' }
+  ];
+  R.compare = rows.map(function(row){
     var copy = {};
     for (var key in s) copy[key] = s[key];
-    copy.loanType = k;
+    copy.loanType = row.key;
+    copy.dpSchedule = row.sched;
     var c = computeCore(copy);
     return {
-      key: k, label: PATHS[k].label,
+      key: row.key, sched: row.sched,
+      label: PATHS[row.key].label + (row.sched === 'student' ? ' — staggered' : ''),
       upfront: c.totals.upfront, atKey: c.totals.atKey, cash: c.totals.cash,
-      cpf: c.totals.cpf, monthly: c.loan.monthly, cashTopUp: c.loan.cashTopUp
+      cpf: c.totals.cpf, monthly: c.loan.monthly, cashTopUp: c.loan.cashTopUp,
+      sign: c.signShare
     };
   });
   return R;
@@ -563,7 +603,7 @@ function defaultState(){
   return {
     v: 1, mode:'couple', flatType:'4-room', price:550000,
     grantMode:'auto', grantManual:0, otherGrant:0,
-    loanType:'hdb', rateHdb:0.026, rateBank:0.028, tenure:25, stressAdd:0.01,
+    loanType:'hdb', dpSchedule:'adult', rateHdb:0.026, rateBank:0.028, tenure:25, stressAdd:0.01,
     mBooking:2, mSign:8, mKey:36,
     gst:1.09, oaRate:0.025, saveRate:0.03, goalRate:0.06,
     salaryCeiling:8000, seCapAnnual:102000,
@@ -585,7 +625,8 @@ return {
   optionFee: optionFee, surveyFee: surveyFee, firePremium: firePremium,
   cpfRates: cpfRates, monthlyOA: monthlyOA, monthlyTakeHome: monthlyTakeHome,
   ratiosFor: ratiosFor, defaultState: defaultState, PATHS: PATHS,
-  EHG_TIERS: EHG_TIERS, RATE_TABLES: RATE_TABLES, OA_SHARE: OA_SHARE, CIT_LABEL: CIT_LABEL
+  EHG_TIERS: EHG_TIERS, RATE_TABLES: RATE_TABLES, OA_SHARE: OA_SHARE, CIT_LABEL: CIT_LABEL,
+  SCHEDULES: SCHEDULES
 };
 })();
 /* ==== BTO ENGINE END ==== */
@@ -617,6 +658,10 @@ function load(){
     if (!o.people || !o.people.length) o.people = d.people;
     while (o.people.length < 2) o.people.push({ name:'Partner', income:0, age:30, oa:0, basis:'employee', citizenship:'SC' });
     o.people.forEach(function (pp) { if (!pp.citizenship) pp.citizenship = 'SC'; });
+    /* migrate the old "staggered" loan option into its own schedule field */
+    if (o.loanType === 'hdb-staggered') { o.loanType = 'hdb'; o.dpSchedule = 'student'; }
+    if (!BTO.PATHS[o.loanType]) o.loanType = 'hdb';
+    if (!BTO.SCHEDULES[o.dpSchedule]) o.dpSchedule = 'adult';
     return o;
   } catch (e) { return d; }
 }
@@ -680,8 +725,16 @@ function buildSidebar(){
 
   h.push('<details class="grp" open><summary>Financing</summary><div class="body">');
   h.push(fSel('loanType', 'Loan', [
-    ['hdb','HDB loan'],['hdb-staggered','HDB loan — staggered DP'],
+    ['hdb','HDB loan'],
     ['bank75','Bank loan — 75% LTV'],['bank55','Bank loan — 55% LTV']]));
+  h.push(fSel('dpSchedule', 'Downpayment schedule', [
+    ['adult', 'Adult applicants — 5% then 20%'],
+    ['student', 'Student / NSF — 2.5% then 22.5%']]));
+  h.push('<div class="mini" style="margin:-4px 0 10px">' + (s.loanType === 'hdb'
+    ? (s.dpSchedule === 'student'
+        ? 'Deferred income assessment: <b>2.5%</b> of the price at signing, <b>22.5%</b> at key collection.'
+        : 'Standard: <b>5%</b> of the price at signing, <b>20%</b> at key collection. All 25% can be CPF.')
+    : 'Bank loans take the 5% + 20% schedule — the 5% must be cash at signing, and the staggered schedule is not available.') + '</div>');
   h.push(fNum('rateHdb', 'HDB interest rate', { suffix:'% / yr', step:0.1, pct:true }));
   h.push(fNum('rateBank', 'Bank interest rate', { suffix:'% / yr', step:0.1, pct:true }));
   h.push(fNum('tenure', 'Loan tenure', { suffix:'years', step:1, min:5, max:30 }));
@@ -845,10 +898,10 @@ function viewPayments(R){
   out.push('<div class="card"><h3 class="h">Same flat, four financing routes</h3><table>' +
     '<tr><th>Route</th><th>Cash by signing</th><th>Cash at key</th><th>Total cash</th><th>Monthly</th><th>Cash top-up</th></tr>');
   R.compare.forEach(function(c){
-    out.push('<tr' + (c.key === R.s.loanType ? ' class="tot"' : '') + '><td>' + c.label + '</td><td>' + fmt(c.upfront) + '</td><td>' +
+    out.push('<tr' + ((c.key === R.s.loanType && c.sched === R.scheduleKey) ? ' class="tot"' : '') + '><td>' + c.label + '</td><td>' + fmt(c.upfront) + '</td><td>' +
       fmt(c.atKey) + '</td><td>' + fmt(c.cash) + '</td><td>' + fmt(c.monthly) + '</td><td>' + fmt(c.cashTopUp) + '</td></tr>');
   });
-  out.push('</table><div class="msg">Staggered downpayment is only available to first-timer couples (and downsizers to a 3-room or smaller flat in a non-mature estate) — not to singles. Bank loans are fixed at the bank\u2019s rate for the lock-in, HDB loans track the CPF OA rate + 0.1%.</div></div>');
+  out.push('</table><div class="msg">The 2.5% + 22.5% schedule is the deferred income assessment for a first-timer couple that includes a student or NSF — it is not available to singles or to bank loans. On an HDB loan the whole 25% can come from CPF OA; on a bank loan the first 5% must be cash.</div></div>');
   return out.join('');
 }
 
@@ -907,46 +960,61 @@ function interestChart(L){
     lineChart({ series: series, maxX: L.n, h: 210 });
 }
 
-/* the sentence that explains the monthly number — it must name the deadline that
-   actually sets it, otherwise a big lump at signing reads as a mystery figure */
-function saveUpStory(S){
-  var head = 'The flat needs <b>' + fmt(S.immediate) + '</b> almost immediately (application plus option fee), <b>' +
-    fmt(S.need3) + '</b> at signing and <b>' + fmt(S.need4) + '</b> at key collection. ';
-  var small = S.need4 < Math.max(250, 0.15 * S.need3);
+/* the sentence that explains the monthly number — it names WHO the figure is for,
+   WHICH payment it funds, and what happens after that payment is made */
+function saveUpStory(S, R){
+  var who = R.single ? 'On your own' : 'As a couple';
+  var signPct = Math.round(R.signShare * 1000) / 10;
+  var keyPct = Math.round((R.path.dp - R.signShare) * 1000) / 10;
+  var line1, line2;
+
   if (S.driver === 'signing'){
-    if (small){
-      return head + 'The signing stage is the whole job, and it is only ' + S.m3 + ' months away: <b>' +
-        fmt(S.need3) + ' ÷ ' + S.m3 + ' months = ' + fmt(S.signingOnlyMonthly) + ' a month</b>' +
-        (S.afterSign > 0.5 ? ', dropping to <b>' + fmt(S.afterSign) + '</b> after that.' : ', then nothing — the key-collection bill is already covered by the CPF you will have built up.');
-    }
-    return head + 'The signing lump sets the pace: <b>' + fmt(S.need3) + ' ÷ ' + S.m3 + ' months = ' +
-      fmt(S.signingOnlyMonthly) + ' a month</b>, against <b>' + fmt(S.keyOnlyMonthly) +
-      '</b> if you only had to fund the total by key collection. Saving the higher figure is what leaves <b>' +
-      fmt(S.ahead) + '</b> spare by key collection — renovation money, or a reason to drop to <b>' +
-      fmt(S.afterSign) + '</b> a month once the lease is signed.';
+    line1 = who + ': <b>' + fmt(S.growth) + ' a month for the first ' + S.m3 + ' months</b> covers the first downpayment only — ' +
+      signPct + '% of the price, <b>' + fmt(S.need3) + '</b> after whatever CPF settles.';
+    line2 = S.afterSign < 0.5
+      ? 'From month ' + (S.m3 + 1) + ' the figure is <b>$0</b>: the CPF OA you build up over the remaining ' + (S.m4 - S.m3) +
+        ' months covers the ' + keyPct + '% due at key collection.'
+      : 'From month ' + (S.m3 + 1) + ' it drops to <b>' + fmt(S.afterSign) + ' a month</b> for the ' + keyPct +
+        '% balance due at key collection.';
+  } else {
+    line1 = who + ': <b>' + fmt(S.growth) + ' a month for ' + S.m4 + ' months</b> funds the whole cash bill of <b>' +
+      fmt(S.need3 + S.need4) + '</b> — key collection sets the pace, and the first downpayment (' + signPct +
+      '% of the price) is small enough to clear inside that rate.';
+    line2 = 'Nothing changes at signing: the same monthly figure carries you to the keys.';
   }
-  return head + 'The total is the pace-setter here: <b>' + fmt(S.need3 + S.need4) + ' ÷ ' + S.m4 +
-    ' months = ' + fmt(S.keyOnlyMonthly) + ' a month</b>, and that also clears the signing lump in time.';
+
+  var cashLine = 'Cash by stage: <b>' + fmt(S.immediate) + '</b> almost immediately (application plus option fee), <b>' +
+    (S.need3 < 1 ? 'nothing' : fmt(S.need3)) + '</b> at signing (' + signPct + '%) and <b>' +
+    (S.need4 < 1 ? 'nothing' : fmt(S.need4)) + '</b> at key collection (' + keyPct + '%).';
+
+  return line1 + ' ' + line2 + ' ' + cashLine;
 }
 
 function viewSaveUp(R){
   var S = R.saveup, L = R.loan;
   var out = [];
+  var who = R.single ? 'on your own' : 'as a couple';
+  var signPct = Math.round(R.signShare * 1000) / 10;
+  var keyPct = Math.round((R.path.dp - R.signShare) * 1000) / 10;
   var basis = S.driver === 'signing'
-    ? fmt(S.need3) + ' due at signing ÷ ' + S.m3 + ' months'
-    : fmt(S.need3 + S.need4) + ' total ÷ ' + S.m4 + ' months';
+    ? who + ' · ' + fmt(S.need3) + ' first downpayment (' + signPct + '%) ÷ ' + S.m3 + ' months'
+    : who + ' · ' + fmt(S.need3 + S.need4) + ' total ÷ ' + S.m4 + ' months';
+  var afterLabel, afterLabelShort;
+  if (S.afterSign < 0.5){ afterLabel = '$0 from month ' + (S.m3 + 1) + ' — CPF covers the ' + keyPct + '% at key'; }
+  else if (Math.abs(S.afterSign - S.growth) < 1){ afterLabel = 'unchanged — the same rate runs to key collection'; }
+  else { afterLabel = 'from month ' + (S.m3 + 1) + ', for the ' + keyPct + '% balance'; }
   out.push('<div class="kpis">');
-  out.push(kpi('Save each month — cash', fmt(S.growth), basis, true));
+  out.push(kpi(S.driver === 'signing' ? 'Save each month — first downpayment' : 'Save each month — the whole bill', fmt(S.growth), basis, true));
   out.push(kpi('You can set aside', fmt(S.capacity), R.s.capacityMode === 'manual' ? 'manual figure' : 'take-home less commitments'));
   out.push(kpi(S.surplus >= 0 ? 'Spare for other goals' : 'Shortfall each month', fmt(Math.abs(S.surplus)),
     S.surplus >= 0 ? 'free cash after the house' : 'more needed than you have', S.surplus >= 0));
-  out.push(kpi('After the lease is signed', fmt(S.afterSign), 'two-speed plan: lighter from month ' + S.m3));
+  out.push(kpi('Then, for the balance', fmt(S.afterSign), afterLabel));
   out.push('</div>');
 
   out.push('<div class="card"><h3 class="h">Cash needed vs cash saved</h3>' +
     '<div class="legend"><span><i style="background:var(--gold)"></i>Cash required by each stage</span><span><i style="background:var(--accent)"></i>Your savings at the required rate</span></div>' +
     saveCurve(R) +
-    '<div class="msg">' + saveUpStory(S) + '</div></div>');
+    '<div class="msg">' + saveUpStory(S, R) + '</div></div>');
 
   out.push('<div class="grid2">');
   out.push('<div class="card"><h3 class="h">What that leaves for other goals</h3>' +
@@ -973,10 +1041,19 @@ function viewSaveUp(R){
   out.push('</div>');
 
   var msg = [];
-  if (!S.achievable && S.monthsNeeded){
-    msg.push('<div class="msg warn">At <b>' + fmt(S.capacity) + '</b> a month you cannot hit key collection in ' + S.m4 + ' months. The same flat is funded by month <b>' + S.monthsNeeded + '</b> (' + (S.monthsNeeded/12).toFixed(1) + ' years) — either save more, choose a cheaper flat or a staggered route.</div>');
-  } else if (!S.achievable){
-    msg.push('<div class="msg warn">Your available cash does not cover even the signing-stage payment of <b>' + fmt(S.need3) + '</b>. The gap has to come from somewhere: a smaller flat, a bigger grant, more CPF OA, or family support.</div>');
+  if (!S.achievable){
+    if (S.driver === 'signing' && S.signingMonthsNeeded){
+      msg.push('<div class="msg warn">At <b>' + fmt(S.capacity) + '</b> a month the first downpayment of <b>' + fmt(S.need3) +
+        '</b> takes <b>' + S.signingMonthsNeeded + ' months</b>, but the lease is signed in ' + S.m3 + '. You are ' +
+        (S.signingMonthsNeeded - S.m3) + ' months short — find an extra <b>' + fmt(S.gap) +
+        ' a month</b>, or a later signing date.</div>');
+    } else if (S.monthsNeeded){
+      msg.push('<div class="msg warn">At <b>' + fmt(S.capacity) + '</b> a month the total is only funded by month <b>' +
+        S.monthsNeeded + '</b> (' + (S.monthsNeeded/12).toFixed(1) + ' years) — save more, choose a cheaper flat, or take the staggered schedule.</div>');
+    } else {
+      msg.push('<div class="msg warn">Your available cash does not cover the first downpayment of <b>' + fmt(S.need3) +
+        '</b> in ' + S.m3 + ' months. The gap has to come from somewhere: a smaller flat, a bigger grant, more CPF OA, or family support.</div>');
+    }
   } else if (S.surplus > 0){
     msg.push('<div class="msg ok">Clear to proceed: <b>' + fmt(S.surplus) + '</b> a month stays free for your other goals after funding the flat.</div>');
   }
@@ -1017,8 +1094,8 @@ function viewSplit(R){
     out.push('</div>');
     out.push('<div class="card"><h3 class="h">What changes buying alone</h3><ul class="clean">' +
       '<li><b>One income, one OA.</b> All ' + fmt(R.totals.cash) + ' of cash and ' + fmt(R.totals.cpf) + ' of CPF come from you.</li>' +
-      '<li><b>No staggered downpayment.</b> The staggered scheme is for first-timer couples (and downsizers); singles pay the normal schedule — ' +
-        Math.round(R.path.sign*100) + '% of the price at signing, the rest at key collection.</li>' +
+      '<li><b>No staggered downpayment.</b> The staggered (2.5%) schedule is for first-timer couples on the deferred income assessment; singles pay the standard schedule — ' +
+        Math.round(R.signShare*1000)/10 + '% of the price at signing, ' + (100 - Math.round(R.signShare*1000)/10) + '% at key collection.</li>' +
       '<li><b>Two-room Flexi in a non-mature estate</b> is the typical route under the Single Singapore Citizen scheme; grants are at half the couple rate (' + fmt(R.totals.ehgAuto) + ' here).</li>' +
       '<li><b>The mortgage must fit one salary.</b> Instalment is ' + pct(R.loan.msr,1) + ' of your gross income, against a 30% MSR cap.</li>' +
       '</ul></div>');
@@ -1080,7 +1157,9 @@ function viewSummary(R){
     '<div class="kpis" style="margin-top:4px">');
   out.push(kpi('Cash needed in total', fmt(R.totals.cash), 'from today to key collection', true));
   out.push(kpi('CPF OA used', fmt(R.totals.cpf), 'plus grant ' + fmt(R.totals.grant)));
-  out.push(kpi('Save per month now', fmt(S.growth), 'for ' + S.m4 + ' months'));
+  out.push(kpi('Save per month now', fmt(S.growth), S.driver === 'signing'
+    ? 'for ' + S.m3 + ' months, then ' + (S.afterSign < 1 ? '$0' : fmt(S.afterSign) + '/mo')
+    : 'for ' + S.m4 + ' months'));
   out.push(kpi('Monthly instalment', fmt(L.monthly), 'CPF ' + fmt(Math.min(L.monthly, L.cpfInflow)) + ' · cash ' + fmt(L.cashTopUp)));
   out.push(kpi('Left for other goals', fmt(Math.max(0, S.surplus)), 'per month, during construction', true));
   out.push('</div>');
@@ -1096,14 +1175,18 @@ function viewSummary(R){
     ', of which ' + fmt(R.totals.dpTotal) + ' is downpayment and ' + fmt(L.amount) + ' is borrowed on a ' + L.label.toLowerCase() + ' over ' + L.tenure + ' years at ' + pct(L.rate,2) +
     '. The instalment is ' + fmt(L.monthly) + ' a month; CPF OA from your salary pays ' + fmt(Math.min(L.monthly, L.cpfInflow)) + ' of it' +
     (L.cashTopUp > 0 ? ' and the remaining ' + fmt(L.cashTopUp) + ' is cash.' : ' and nothing comes out of your pocket.') +
-    ' Between now and key collection the flat needs ' + fmt(R.totals.cash) + ' of cash in total, so setting aside ' + fmt(S.growth) + ' a month for ' + S.m4 + ' months covers it' +
+    ' Between now and key collection the flat needs ' + fmt(R.totals.cash) + ' of cash in total. Set aside <b>' + fmt(S.growth) + ' a month for the first ' +
+    (S.driver === 'signing' ? S.m3 : S.m4) + ' months to cover ' + (S.driver === 'signing' ? 'the first downpayment of ' + fmt(S.need3) + ' (' + Math.round(R.signShare*1000)/10 + '% of the price)' : 'the whole bill') +
+    (S.afterSign < 1 ? '; from month ' + (S.m3 + 1) + ' the figure is $0 because CPF covers the balance at key collection'
+      : '; it then settles at ' + fmt(S.afterSign) + ' a month for the balance') +
     (S.surplus >= 0 ? ', leaving ' + fmt(S.surplus) + ' a month free for your investment goals' : ' — ' + fmt(-S.surplus) + ' a month more than you currently have available') + '.</p></div>');
 
   out.push('<div class="card"><h3 class="h">Assumptions on this page</h3><ul class="clean">' +
     '<li>Purchase price ' + fmt(R.totals.gross) + ', ' + R.s.flatType + ', grant ' + fmt(R.totals.grant) + ' (EHG ' + fmt(R.totals.ehgAuto) + (R.s.otherGrant ? ' + other ' + fmt(R.s.otherGrant) : '') + ').</li>' +
     '<li>Stamp duty ' + fmt(R.totals.bsd) + ' and legal ' + fmt(R.totals.legal) + ' computed on the price before grant.</li>' +
     '<li>CPF OA grows ' + pct(R.s.oaRate,1) + ' a year; savings grow ' + pct(S.saveRate,1) + ' a year; other investments ' + pct(S.goalRate,1) + '.</li>' +
-    '<li>Key collection ' + R.s.mKey + ' months out, signing at ' + R.s.mSign + '. HPS ' + fmt(R.s.hps) + ', fire insurance per flat type.</li>' +
+    '<li>Key collection ' + R.s.mKey + ' months out, signing at ' + R.s.mSign + '. Downpayment ' + R.schedule.short +
+      ' (' + R.schedule.label.toLowerCase() + '). HPS ' + fmt(R.s.hps) + ', fire insurance per flat type.</li>' +
     '<li>CPF at ' + R.perPerson.map(function(pp){ return esc(pp.name) + ' ' + pct(pp.cpfRate,1) + ' (' + (pp.cit === 'SC' ? 'citizen' : pp.citLabel) + ')'; }).join(', ') +
       ' — from CPF Board\u2019s 2026 contribution tables.</li>' +
     '</ul></div>');
@@ -1211,7 +1294,7 @@ document.addEventListener('change', function (e) {
   if (el.tagName === 'SELECT' && el.dataset.bind){
     setPath(state, el.dataset.bind, el.value);
     save();
-    var rebuild = ['loanType','grantMode','basis'].indexOf(el.dataset.bind.split('.')[0]) >= 0 ||
+    var rebuild = ['loanType','grantMode','basis','dpSchedule'].indexOf(el.dataset.bind.split('.')[0]) >= 0 ||
       /\.(basis|citizenship)$/.test(el.dataset.bind);
     if (rebuild) buildSidebar();
     schedule();
