@@ -627,7 +627,7 @@ function defaultState(){
     v: 1, mode:'couple', flatType:'4-room', price:550000,
     grantMode:'auto', grantManual:0, otherGrant:0,
     loanType:'hdb', dpSchedule:'adult', rateHdb:0.026, rateBank:0.028, tenure:25, stressAdd:0.01,
-    mBooking:2, mSign:8, mKey:36,
+    mBooking:1, mSign:8, mKey:43,
     gst:1.09, oaRate:0.025, saveRate:0.0005, goalRate:0.06, vehicle:'bank',
     vehBank:0.0005, vehFd:0.015, vehEndowment:0.0375, vehPortfolio:0.06,
     salaryCeiling:8000, seCapAnnual:102000,
@@ -780,9 +780,12 @@ function buildSidebar(){
   h.push(fNum('mSign', 'Months to sign lease', { suffix:'months', step:1, min:1 }));
   h.push(fNum('mKey', 'Months to key collection', { suffix:'months', step:1, min:2 }));
   h.push('<div class="seg" style="margin-top:6px">' +
-    [['24','2 yrs'],['36','3 yrs'],['48','4 yrs'],['60','5 yrs']].map(function(p){
-      return '<button type="button" data-set="mKey" data-val="' + p[0] + '"' + (String(s.mKey) === p[0] ? ' class="on"' : '') + '>' + p[1] + '</button>';
+    [[36,'3 yrs'],[42,'3.5 yrs'],[48,'4 yrs'],[60,'5 yrs']].map(function(p){
+      var v = String(Math.max(2, s.mBooking + p[0]));
+      return '<button type="button" data-set="mKey" data-val="' + v + '"' + (String(s.mKey) === v ? ' class="on"' : '') + ' data-tip="' + p[1] + ' after booking">' + p[1] + '</button>';
     }).join('') + '</div>');
+  h.push('<div class="mini" style="margin-top:8px">HDB typical: 4–9 months from booking to the Agreement for Lease, ' +
+    'then 3–5 years to key collection (median 42 months). Application to keys is usually 4–6 years in all.</div>');
   h.push('</div></details>');
 
   h.push('<details class="grp" open><summary>' + (s.mode === 'single' ? 'You' : 'Both of you') + '</summary><div class="body">');

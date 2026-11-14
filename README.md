@@ -57,7 +57,20 @@ Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
 | 1 Application | at launch | $10, cash |
 | 2 Booking | unit selection | option fee $500 (2-room) / $1,000 (3-room) / $2,000 (4-room+), cash, credited to the downpayment |
 | 3 Agreement for lease | ~8 months (input) | **first** downpayment share (5% or 2.5% of the price) less the option fee, buyer stamp duty, legal fee |
-| 4 Key collection | ~36 months (input) | **balance** downpayment (20% or 22.5%), survey, lease + mortgage in-escrow fees, stamp duty on deed of assignment, HPS, fire insurance (+ optional town-council advance) |
+| 4 Key collection | ~43 months (input) | **balance** downpayment (20% or 22.5%), survey, lease + mortgage in-escrow fees, stamp duty on deed of assignment, HPS, fire insurance (+ optional town-council advance) |
+
+**Timeline defaults** — HDB's typical path, all three are inputs
+
+| Milestone | Default | HDB typical |
+|---|---|---|
+| Flat booking | 1 month | at unit selection |
+| Agreement for lease | 8 months | **4–9 months after booking** |
+| Key collection | 43 months | **3–5 years after booking, median 42 months** |
+
+So key collection defaults to booking + 42 (1 + 42 = 43), and the year shortcuts
+(3 / 3.5 / 4 / 5 yrs) set key collection relative to the booking month rather than
+as an absolute figure — the 3.5-year shortcut is the median. Application to keys
+is usually 4–6 years in all, most of it construction.
 
 **Downpayment schedule** — chosen in the fact find, separate from the lender
 
