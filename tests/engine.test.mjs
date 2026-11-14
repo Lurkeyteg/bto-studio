@@ -433,9 +433,9 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   eq('funding: rates match the advisor-suite defaults',
      S.funding.map(f => f.rate).join(','), '0.0005,0.015,0.0375,0.06');
 
-  /* real rate = (1 + nominal) / (1 + inflation) - 1 */
-  eq('funding: real rate of bank savings is -2.86%', S.funding[0].real, -0.0286, 0.0002);
-  eq('funding: real rate of the portfolio is 2.91%', S.funding[3].real, 0.0291, 0.0002);
+  /* rates are quoted nominal — no inflation deflation in this view */
+  eq('funding: rows carry no real-rate column', S.funding.some(f => 'real' in f), false);
+  eq('funding: the bank row is quoted at 0.05% nominal', S.funding[0].rate, 0.0005);
 
   /* a better vehicle needs less money each month for the same goal */
   eq('funding: bank needs the most per month', S.funding[0].monthly > S.funding[1].monthly, true);

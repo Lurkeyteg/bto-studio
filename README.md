@@ -158,17 +158,18 @@ and is projected forward at the investment rate to key collection.
 is solved four times, once per funding vehicle, and the selected vehicle drives
 the headline requirement:
 
-| Vehicle | Nominal (default) | Real at 3% inflation |
-|---|---|---|
-| Bank savings | 0.05% | −2.86% |
-| Fixed deposit | 1.50% | −1.46% |
-| Endowment | 3.75% | 0.73% |
-| Investment portfolio | 6.00% | 2.91% |
+| Vehicle | Rate (default) |
+|---|---|
+| Bank savings | 0.05% |
+| Fixed deposit | 1.50% |
+| Endowment | 3.75% |
+| Investment portfolio | 6.00% |
 
-Real rate = `(1 + nominal) / (1 + inflation) − 1`. Rows show the requirement per
-month and per year, mirroring the Advisor Suite's "ways to close the gap" card;
-the chosen row is highlighted, and typing a rate of your own switches the
-selector to "Custom rate". All five rates plus inflation stay editable inputs.
+Each row shows the requirement per month and per year, mirroring the Advisor
+Suite's "ways to close the gap" card; the chosen row is highlighted, and typing a
+rate of your own switches the selector to "Custom rate". Rates are quoted
+nominal — there is no inflation deflation on this card. All four rates stay
+editable inputs.
 
 ## Assumptions and things to watch
 

@@ -553,17 +553,12 @@ function computeCore(s){
     goalFV: goalFV, goalPlain: Math.max(0, surplus) * m4,
     monthsNeeded: monthsNeeded, achievable: achievable,
     saveRate: s.saveRate || 0, goalRate: s.goalRate || 0,
-    inflation: (s.inflation === undefined ? 0.03 : s.inflation),
     vehicle: s.vehicle || 'custom',
-    /* the same goal funded from each vehicle — nominal and after inflation */
+    /* the same goal funded from each vehicle */
     funding: Object.keys(VEHICLES).map(function(k){
       var vr = VEHICLES[k].rate;
       var amt = requiredParts(need3, m3, need4, m4, vr / 12).value;
-      return {
-        key: k, label: VEHICLES[k].label, rate: vr,
-        real: ((1 + vr) / (1 + (s.inflation === undefined ? 0.03 : s.inflation))) - 1,
-        monthly: amt, annual: amt * 12
-      };
+      return { key: k, label: VEHICLES[k].label, rate: vr, monthly: amt, annual: amt * 12 };
     }),
     immediate: stages[0].cash + stages[1].cash
   };
@@ -624,7 +619,7 @@ function defaultState(){
     grantMode:'auto', grantManual:0, otherGrant:0,
     loanType:'hdb', dpSchedule:'adult', rateHdb:0.026, rateBank:0.028, tenure:25, stressAdd:0.01,
     mBooking:2, mSign:8, mKey:36,
-    gst:1.09, oaRate:0.025, saveRate:0.0005, goalRate:0.06, inflation:0.03, vehicle:'bank',
+    gst:1.09, oaRate:0.025, saveRate:0.0005, goalRate:0.06, vehicle:'bank',
     salaryCeiling:8000, seCapAnnual:102000,
     hps:185, fireOverride:null, townCouncil:0,
     capacityMode:'auto', capacityManual:0, otherCommitments:1200,
@@ -685,7 +680,6 @@ function load(){
        became 0.00025) — no CPF OA rate is below 0.5% */
     if (typeof o.oaRate !== 'number' || o.oaRate < 0.005 || o.oaRate > 0.06) o.oaRate = d.oaRate;
     if (!BTO.VEHICLES[o.vehicle]) o.vehicle = 'custom';
-    if (typeof o.inflation !== 'number') o.inflation = 0.03;
     return o;
   } catch (e) { return d; }
 }
@@ -810,7 +804,6 @@ function buildSidebar(){
     ['bank','Bank savings'],['fd','Fixed deposit'],['endowment','Endowment'],
     ['portfolio','Investment portfolio'],['custom','Custom rate']]));
   h.push(fNum('saveRate', 'Rate on those savings', { suffix:'% / yr', step:0.05, min:0, pct:true }));
-  h.push(fNum('inflation', 'Inflation assumption', { suffix:'% / yr', step:0.5, min:0, pct:true }));
   h.push(fNum('goalRate', 'Return on other investments', { suffix:'% / yr', step:0.5, min:0, pct:true }));
   h.push(fSeg('capacityMode', 'Monthly cash available', [['auto','Auto'],['manual','Manual']]));
   if (s.capacityMode === 'manual') h.push(fNum('capacityManual', 'Set aside per month', { prefix:'$', step:100, min:0 }));
@@ -1048,16 +1041,15 @@ function viewSaveUp(R){
 
   /* the advisor-suite style card: the same goal funded four different ways */
   out.push('<div class="card"><h3 class="h">Where the money sits</h3>' +
-    '<div class="mini" style="margin:-4px 0 10px">Same goal, different vehicle — what to set aside each month, and what that return is worth after inflation.</div>' +
-    '<table><tr><th>Vehicle</th><th>Nominal</th><th>Real</th><th>Per year</th><th>Per month</th></tr>');
+    '<div class="mini" style="margin:-4px 0 10px">Same goal, different vehicle — what to set aside each month.</div>' +
+    '<table><tr><th>Vehicle</th><th>Rate</th><th>Per year</th><th>Per month</th></tr>');
   S.funding.forEach(function(f){
     out.push('<tr' + (f.key === S.vehicle ? ' class="tot"' : '') + '><td>' + f.label + '</td>' +
-      '<td>' + pct(f.rate, 2) + '</td><td>' + pct(f.real, 2) + '</td>' +
+      '<td>' + pct(f.rate, 2) + '</td>' +
       '<td>' + fmt(f.annual) + '</td><td>' + fmt(f.monthly) + '</td></tr>');
   });
   out.push('</table>' +
-    '<div class="msg">Illustration only — not advice and not a product recommendation. Nominal returns are deflated by the ' +
-    pct(S.inflation, 1) + ' inflation assumption, so the real column shows what the rate is worth after inflation. ' +
+    '<div class="msg">Illustration only — not advice and not a product recommendation. ' +
     (S.vehicle === 'custom' ? 'Your custom rate of ' + pct(S.saveRate,2) + ' is the one driving the numbers above.' :
       'The highlighted row is the vehicle driving the numbers above.') + '</div></div>');
 
@@ -1231,7 +1223,7 @@ function viewSummary(R){
     '<li>Stamp duty ' + fmt(R.totals.bsd) + ' and legal ' + fmt(R.totals.legal) + ' computed on the price before grant.</li>' +
     '<li>CPF OA grows ' + pct(R.s.oaRate,1) + ' a year; the house savings sit in ' +
       (S.vehicle === 'custom' ? 'a custom vehicle at ' + pct(S.saveRate,2) : BTO.VEHICLES[S.vehicle].label.toLowerCase() + ' at ' + pct(S.saveRate,2)) +
-      '; other investments return ' + pct(S.goalRate,1) + '; inflation ' + pct(S.inflation,1) + '.</li>' +
+      '; other investments return ' + pct(S.goalRate,1) + '.</li>' +
     '<li>Key collection ' + R.s.mKey + ' months out, signing at ' + R.s.mSign + '. Downpayment ' + R.schedule.short +
       ' (' + R.schedule.label.toLowerCase() + '). HPS ' + fmt(R.s.hps) + ', fire insurance per flat type.</li>' +
     '<li>CPF at ' + R.perPerson.map(function(pp){ return esc(pp.name) + ' ' + pct(pp.cpfRate,1) + ' (' + (pp.cit === 'SC' ? 'citizen' : pp.citLabel) + ')'; }).join(', ') +
