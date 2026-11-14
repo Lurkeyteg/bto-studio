@@ -271,5 +271,93 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   })(), true);
 }
 
+/* ---------------- 13. citizenship: SC / PR 1st year / PR 2nd year ----------------
+ * Expected rates come from CPF Board's "CPF Contribution Rate Table from 1 January
+ * 2026": Table 1 (SC & SPR 3rd year on), Table 2 (SPR 1st year), Table 3 (SPR 2nd
+ * year), all under graduated (G/G) rates. OA share from the allocation table (Table 6,
+ * by age only). Every total below is employee + employer from the PDF.
+ */
+{
+  const p = (cit, age = 30, income = 5000) => ({ name: 'X', income, age, oa: 0, basis: 'employee', citizenship: cit });
+  const s = base({});
+
+  const sc = BTO.cpfRates(30, 'SC');
+  eq('cit: citizen under 55 is 20% + 17%', [sc.emp, sc.empr].join('/'), '0.2/0.17');
+  eq('cit: citizen total 37%', sc.total, 0.37, 1e-9);
+
+  const pr1 = BTO.cpfRates(30, 'PR1');
+  eq('cit: PR 1st year under 55 is 5% + 4%', [pr1.emp, pr1.empr].join('/'), '0.05/0.04');
+  eq('cit: PR 1st year total 9%', pr1.total, 0.09, 1e-9);
+
+  const pr2 = BTO.cpfRates(30, 'PR2');
+  eq('cit: PR 2nd year under 55 is 15% + 9%', [pr2.emp, pr2.empr].join('/'), '0.15/0.09');
+  eq('cit: PR 2nd year total 24%', pr2.total, 0.24, 1e-9);
+
+  /* age bands above 55, straight from the same three tables */
+  eq('cit: citizen 55-60 is 18% + 16%', BTO.cpfRates(57, 'SC').total, 0.34, 1e-9);
+  eq('cit: citizen 60-65 is 12.5% + 12.5%', BTO.cpfRates(62, 'SC').total, 0.25, 1e-9);
+  eq('cit: citizen 65-70 is 7.5% + 9%', BTO.cpfRates(67, 'SC').total, 0.165, 1e-9);
+  eq('cit: citizen above 70 is 5% + 7.5%', BTO.cpfRates(72, 'SC').total, 0.125, 1e-9);
+  eq('cit: PR1 55-60 stays 5% + 4%', BTO.cpfRates(57, 'PR1').total, 0.09, 1e-9);
+  eq('cit: PR1 60-65 is 5% + 3.5%', BTO.cpfRates(62, 'PR1').total, 0.085, 1e-9);
+  eq('cit: PR2 55-60 is 12.5% + 6%', BTO.cpfRates(57, 'PR2').total, 0.185, 1e-9);
+  eq('cit: PR2 60-65 is 7.5% + 3.5%', BTO.cpfRates(62, 'PR2').total, 0.11, 1e-9);
+  eq('cit: PR2 above 65 is 5% + 3.5%', BTO.cpfRates(67, 'PR2').total, 0.085, 1e-9);
+
+  /* monthly money: OA credited and take-home, at $5,000 and age 30 */
+  eq('cit: citizen OA on 5,000', BTO.monthlyOA(p('SC'), s), 1850 * 0.6217, 0.01);
+  eq('cit: PR1 OA on 5,000', BTO.monthlyOA(p('PR1'), s), 450 * 0.6217, 0.01);
+  eq('cit: PR2 OA on 5,000', BTO.monthlyOA(p('PR2'), s), 1200 * 0.6217, 0.01);
+  eq('cit: citizen take-home on 5,000', BTO.monthlyTakeHome(p('SC'), s), 4000, 0.01);
+  eq('cit: PR1 take-home on 5,000', BTO.monthlyTakeHome(p('PR1'), s), 4750, 0.01);
+  eq('cit: PR2 take-home on 5,000', BTO.monthlyTakeHome(p('PR2'), s), 4250, 0.01);
+  eq('cit: PR contribution still capped by the 8,000 salary ceiling',
+     BTO.monthlyOA(p('PR1', 30, 12000), s), 8000 * 0.09 * 0.6217, 0.01);
+
+  /* the model reacts: swapping a partner from citizen to PR moves money to cash */
+  const bothSC = BTO.compute(base({
+    price: 550000, flatType: '4-room', loanType: 'hdb',
+    people: [{ name: 'A', income: 5000, age: 30, oa: 20000, basis: 'employee', citizenship: 'SC' },
+             { name: 'B', income: 4000, age: 29, oa: 15000, basis: 'employee', citizenship: 'SC' }]
+  }));
+  const mixed = BTO.compute(base({
+    price: 550000, flatType: '4-room', loanType: 'hdb',
+    people: [{ name: 'A', income: 5000, age: 30, oa: 20000, basis: 'employee', citizenship: 'SC' },
+             { name: 'B', income: 4000, age: 29, oa: 15000, basis: 'employee', citizenship: 'PR1' }]
+  }));
+  eq('cit: PR partner lowers CPF used', mixed.totals.cpf < bothSC.totals.cpf, true);
+  eq('cit: PR partner raises cash needed', mixed.totals.cash > bothSC.totals.cash, true);
+  eq('cit: PR partner lowers the monthly OA inflow', mixed.loan.cpfInflow < bothSC.loan.cpfInflow, true);
+  eq('cit: PR partner may push the instalment onto cash', mixed.loan.cashTopUp > bothSC.loan.cashTopUp, true);
+  eq('cit: PR row is labelled in the output', mixed.perPerson[1].citLabel, 'PR — 1st year');
+  eq('cit: per-person rate is exposed for the UI', mixed.perPerson[1].cpfRate, 0.09, 1e-9);
+
+  /* a PR1 partner on 4,000 contributes 9% of 4,000, i.e. 360 a month total */
+  eq('cit: PR1 partner OA on 4,000', mixed.perPerson[1].monthlyOA, 360 * 0.6217, 0.01);
+
+  /* pooling must be visible: the citizen's OA covers part of the PR's share */
+  eq('cit: the citizen lends OA to the PR partner', mixed.perPerson[0].cpfOut > 0, true);
+  eq('cit: the PR partner draws OA from the citizen', mixed.perPerson[1].cpfIn > 0, true);
+  eq('cit: pooled in equals pooled out', Math.round(mixed.perPerson[0].cpfOut), Math.round(mixed.perPerson[1].cpfIn));
+  mixed.perPerson.forEach((pp, i) => {
+    eq(`cit: own + pooled equals the row total (person ${i})`, Math.round(pp.cpfOwn + pp.cpfIn), Math.round(pp.cpf));
+  });
+  eq('cit: rows still sum to total CPF',
+     Math.round(mixed.perPerson.reduce((a, pp) => a + pp.cpf, 0)), Math.round(mixed.totals.cpf));
+  eq('cit: both citizens means nobody pools', (() => {
+    /* identical incomes and identical OA balances -> identical shares -> no pooling */
+    const twin = BTO.compute(base({
+      price: 550000, flatType: '4-room', loanType: 'hdb',
+      people: [{ name: 'A', income: 5000, age: 30, oa: 20000, basis: 'employee', citizenship: 'SC' },
+               { name: 'B', income: 5000, age: 30, oa: 20000, basis: 'employee', citizenship: 'SC' }]
+    }));
+    return twin.perPerson.every(pp => pp.cpfIn < 0.5 && pp.cpfOut < 0.5);
+  })(), true);
+
+  /* missing / unknown citizenship falls back to citizen rates rather than NaN */
+  eq('cit: missing status defaults to citizen', BTO.cpfRates(30).total, 0.37, 1e-9);
+  eq('cit: unknown status falls back to citizen', BTO.cpfRates(30, 'XX').cit, 'SC');
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

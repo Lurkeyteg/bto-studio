@@ -25,11 +25,11 @@ Files:
 | File | What it is |
 |---|---|
 | `index.html` | The whole app: engine (marked `BTO ENGINE START/END`), UI, styles |
-| `tests/engine.test.mjs` | 88 assertions run against the engine **extracted from `index.html`** |
+| `tests/engine.test.mjs` | 126 assertions run against the engine **extracted from `index.html`** |
 | `README.md` | This file |
 
 Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
-**88 passed, 0 failed**.
+**126 passed, 0 failed**.
 
 ## Sources
 
@@ -42,6 +42,9 @@ Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
   `Calculation for DPSavings`, `Loan Repayment Amount`, `BTO Key Collection`.
   Supplies the fee scale, EHG table, CPF/OA allocation table, salary ceilings,
   HPS and fire-insurance figures, and the key-collection checklist.
+- **CPF Board** — "CPF Contribution Rate Table from 1 January 2026" (Tables 1–3
+  for citizens, SPR 1st and 2nd year) and the CPF allocation table for OA shares.
+  `cpf.gov.sg/employer/employer-obligations/how-much-cpf-contributions-to-pay`.
 - **HDB / CPF published rules** for BSD bands, conveyancing scale, downpayment
   structure, MSR/TDSR and the staggered downpayment scheme's eligibility.
 
@@ -77,16 +80,35 @@ Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
 - HPS $185 (input — real premium varies by loan, age and tenure).
 - Fire insurance — $1.99 / $3.27 / $4.59 / $5.43 by flat type.
 
-**CPF**
+**CPF — citizenship status**
 
-- Employee 20 / employer 17% below 55, then 18/16, 12.5/12.5, 7.5/9, 5/7.5 by
-  age band; salary ceiling $8,000/month (2026).
-- OA share of total contribution 62.17% below 35, then 56.77 / 51.36 / 40.55 /
+Each person carries a citizenship/PR status, because a PR pays CPF at graduated
+rates and therefore builds almost no OA:
+
+| Age | Citizen (and PR 3rd year on) | PR — 1st year | PR — 2nd year |
+|---|---|---|---|
+| 55 and below | 20% + 17% = 37% | 5% + 4% = 9% | 15% + 9% = 24% |
+| 55–60 | 18% + 16% = 34% | 5% + 4% = 9% | 12.5% + 6% = 18.5% |
+| 60–65 | 12.5% + 12.5% = 25% | 5% + 3.5% = 8.5% | 7.5% + 3.5% = 11% |
+| 65–70 | 7.5% + 9% = 16.5% | 5% + 3.5% = 8.5% | 5% + 3.5% = 8.5% |
+| Above 70 | 5% + 7.5% = 12.5% | 5% + 3.5% = 8.5% | 5% + 3.5% = 8.5% |
+
+Employee share shown second. Source: CPF Board "CPF Contribution Rate Table from
+1 January 2026", Tables 1 (SC / SPR 3rd year on), 2 (SPR 1st year) and 3 (SPR 2nd
+year) under graduated rates (G/G). Salary ceiling $8,000/month applies to all.
+
+- A PR who jointly applies with their employer for full rates (Tables 4–5) is not
+  modelled — that is the exception, and the app shows the standard path.
+- OA share of total contribution is applied by age only (CPF's allocation table
+  is not citizenship-specific): 62.17% below 35, then 56.77 / 51.36 / 40.55 /
   35.3 / 14 / 6.07 / 8%.
 - OA grows at 2.5% a year with monthly contributions compounded to each stage.
 - **CPF pays first, cash covers the rest**, but never more than the mandatory
   cash floor of the chosen route. Any CPF shortfall can be pooled from the
-  partner's OA; whatever is still uncovered becomes cash.
+  partner's OA — the split page shows who lends and who draws — and whatever is
+  still uncovered becomes cash.
+- A PR-only household cannot buy a new flat (at least one applicant must be a
+  citizen); the app says so instead of quietly producing a plan.
 
 **Loan**
 
@@ -135,13 +157,24 @@ and is projected forward at the investment rate to key collection.
   constraints — 2-room Flexi route, no staggered downpayment, half-rate grant.
 - Not modelled: ABSD (not payable on a first BTO), resale levy, renovation,
   furniture, town council charges beyond the input, HDB's actual HPS pricing,
-  income changes during the build, CPF interest on balances above $20k tiers.
-- CPF rates above age 55 are the sheet's figures; verify against CPF Board
-  before relying on them for older buyers.
+  income changes during the build, CPF interest on balances above $20k tiers,
+  and a PR's joint application with their employer for full contribution rates.
+- **CPF OA share above age 55 is still the advisor's original figure** (35.3% and
+  14% of contribution). CPF's published 2025 allocation table says 36.94% and
+  14.9%; the 2026 table has not been published separately, and the 2026 rate rise
+  for 55–70 lands in the Retirement Account, so the OA share is genuinely moving.
+  Under-55 ratios (62.17% etc.) are exact and unchanged. Do not quote a 55+ case
+  without checking the client's actual CPF statement.
+- CPF rounds the total contribution to the nearest dollar and the employee share
+  down; this model does not round month by month, so single dollars can differ.
+- EHG eligibility with a PR spouse is not modelled — the grant is an input. The
+  app warns when every applicant is a PR, since that household cannot buy a BTO.
 - The sheet's `22.5% DP` tab splits the HDB downpayment 2.5% / 22.5%. The video
   and HDB's published rules use **10% at signing and 15% at key collection**
   (or 5% / 20% staggered), which is what this app models. `Calculation for
-  DPSavings` in the same workbook agrees with 5% / 20%.
+  DPSavings` in the same workbook agrees with 5% / 20%. The 2.5% / 22.5% split is
+  the **deferred income assessment (DIA)** variant used when a first-timer couple
+  includes a student/NSF — not yet a route in this app.
 
 ## Deviation log
 

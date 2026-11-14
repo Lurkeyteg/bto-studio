@@ -216,8 +216,19 @@ var EHG_TIERS = [[1500,120000],[2000,110000],[2500,105000],[3000,95000],[3500,90
   [4500,70000],[5000,65000],[5500,55000],[6000,50000],[6500,40000],[7000,30000],
   [7500,25000],[8000,20000],[8500,10000],[9000,5000]];
 
-/* CPF: [upper age bound, employee rate, employer rate] ; OA share of total contribution */
-var AGE_BANDS = [[55,0.20,0.17],[60,0.18,0.16],[65,0.125,0.125],[70,0.075,0.09],[999,0.05,0.075]];
+/* CPF contribution tables — [upper age bound, employee rate, employer rate]
+ * Source: CPF Board "CPF Contribution Rate Table from 1 January 2026"
+ *   SC / SPR 3rd year onwards = Table 1, SPR 1st year = Table 2, SPR 2nd year = Table 3 (G/G)
+ * SPRs may jointly apply with their employer for full rates (Tables 4-5); not modelled here.
+ */
+var RATE_TABLES = {
+  SC:  [[55,0.200,0.170],[60,0.180,0.160],[65,0.1250,0.1250],[70,0.0750,0.0900],[999,0.0500,0.0750]],
+  PR1: [[55,0.050,0.040],[60,0.050,0.040],[65,0.0500,0.0350],[999,0.0500,0.0350]],
+  PR2: [[55,0.150,0.090],[60,0.125,0.060],[65,0.0750,0.0350],[999,0.0500,0.0350]]
+};
+var CIT_LABEL = { SC:'Singapore Citizen', PR1:'PR — 1st year', PR2:'PR — 2nd year onwards' };
+/* OA share of total contribution, by age — allocation is by age, not citizenship
+ * Source: CPF Board allocation table (Table 6) */
 var OA_SHARE = [[35,0.6217],[45,0.5677],[50,0.5136],[55,0.4055],[60,0.353],[65,0.14],[70,0.0607],[999,0.08]];
 
 /* financing paths: total downpayment, share at agreement-for-lease, mandatory-cash share */
@@ -275,11 +286,13 @@ function legalFee(price, gst){
   else f = 30000 * 0.0009 + 30000 * 0.00072 + (price - 60000) * 0.0006;
   return round2(Math.ceil(f) * gst);
 }
-function cpfRates(age){
-  return { emp: bandVal(AGE_BANDS, age, 1), empr: bandVal(AGE_BANDS, age, 2), oa: bandVal(OA_SHARE, age, 1) };
+function cpfRates(age, cit){
+  var t = RATE_TABLES[cit] || RATE_TABLES.SC;
+  var emp = bandVal(t, age, 1), empr = bandVal(t, age, 2);
+  return { emp: emp, empr: empr, total: emp + empr, oa: bandVal(OA_SHARE, age, 1), cit: RATE_TABLES[cit] ? cit : 'SC' };
 }
 function monthlyOA(p, s){
-  var r = cpfRates(p.age || 30);
+  var r = cpfRates(p.age || 30, p.citizenship);
   var income = p.income || 0;
   if (p.basis === 'self'){
     var annual = Math.min(income * 12, s.seCapAnnual || 102000);
@@ -295,7 +308,7 @@ function monthlyTakeHome(p, s){
     return income - (annual / 12) * 0.08;
   }
   var w = Math.min(income, s.salaryCeiling || 8000);
-  return income - w * cpfRates(p.age || 30).emp;
+  return income - w * cpfRates(p.age || 30, p.citizenship).emp;
 }
 function ratiosFor(s, people){
   if (s.mode === 'single' || people.length < 2) return [1];
@@ -406,10 +419,13 @@ function computeCore(s){
       }
     });
     cpfP = cpfP.map(function(c, i){ return Math.min(c, burden[i]); });
-    people.forEach(function(_, i){ consumed[i] += (cpfP[i] - received[i]) + donated[i]; });
     st.byPerson = people.map(function(p, i){
-      return { name: p.name, cpf: cpfP[i], cash: burden[i] - cpfP[i] };
+      return {
+        name: p.name, cpf: cpfP[i], cash: burden[i] - cpfP[i],
+        own: cpfP[i] - received[i], poolIn: received[i], poolOut: donated[i]
+      };
     });
+    people.forEach(function(_, i){ consumed[i] += (cpfP[i] - received[i]) + donated[i]; });
     cpfUsedTotal += st.cpfUsed;
   });
 
@@ -500,13 +516,19 @@ function computeCore(s){
     incomeTotal: incomeTotal, takeHome: takeHome,
     stages: stages, totals: totals, loan: loan, saveup: saveup,
     perPerson: people.map(function(p, i){
+      var cr = cpfRates(p.age || 30, p.citizenship);
       return {
         name: p.name, ratio: ratios[i],
         oa: p.oa || 0, monthlyOA: monthlyOA(p, s), takeHome: monthlyTakeHome(p, s),
         cpf: stages.reduce(function(a,st){ return a + st.byPerson[i].cpf; }, 0),
         cash: stages.reduce(function(a,st){ return a + st.byPerson[i].cash; }, 0),
+        cpfOwn: stages.reduce(function(a,st){ return a + st.byPerson[i].own; }, 0),
+        cpfIn: stages.reduce(function(a,st){ return a + st.byPerson[i].poolIn; }, 0),
+        cpfOut: stages.reduce(function(a,st){ return a + st.byPerson[i].poolOut; }, 0),
         monthlyShare: inst * ratios[i], cpfShare: oaInflow * ratios[i],
-        basis: p.basis, age: p.age
+        basis: p.basis, age: p.age,
+        cit: cr.cit, citLabel: CIT_LABEL[cr.cit],
+        cpfRate: cr.total, employeeRate: cr.emp, oaShare: cr.oa
       };
     })
   };
@@ -540,8 +562,8 @@ function defaultState(){
     capacityMode:'auto', capacityManual:0, otherCommitments:1200,
     splitMode:'equal', splitA:50,
     people:[
-      { name:'You', income:5000, age:30, oa:20000, basis:'employee' },
-      { name:'Partner', income:4000, age:29, oa:15000, basis:'employee' }
+      { name:'You', income:5000, age:30, oa:20000, basis:'employee', citizenship:'SC' },
+      { name:'Partner', income:4000, age:29, oa:15000, basis:'employee', citizenship:'SC' }
     ],
     tab:'payments'
   };
@@ -554,7 +576,7 @@ return {
   optionFee: optionFee, surveyFee: surveyFee, firePremium: firePremium,
   cpfRates: cpfRates, monthlyOA: monthlyOA, monthlyTakeHome: monthlyTakeHome,
   ratiosFor: ratiosFor, defaultState: defaultState, PATHS: PATHS,
-  EHG_TIERS: EHG_TIERS, AGE_BANDS: AGE_BANDS, OA_SHARE: OA_SHARE
+  EHG_TIERS: EHG_TIERS, RATE_TABLES: RATE_TABLES, OA_SHARE: OA_SHARE, CIT_LABEL: CIT_LABEL
 };
 })();
 /* ==== BTO ENGINE END ==== */
@@ -584,7 +606,8 @@ function load(){
     var o = JSON.parse(raw);
     for (var k in d) if (!(k in o)) o[k] = d[k];
     if (!o.people || !o.people.length) o.people = d.people;
-    while (o.people.length < 2) o.people.push({ name:'Partner', income:0, age:30, oa:0, basis:'employee' });
+    while (o.people.length < 2) o.people.push({ name:'Partner', income:0, age:30, oa:0, basis:'employee', citizenship:'SC' });
+    o.people.forEach(function (pp) { if (!pp.citizenship) pp.citizenship = 'SC'; });
     return o;
   } catch (e) { return d; }
 }
@@ -675,10 +698,16 @@ function buildSidebar(){
       '<div class="inp" style="margin-bottom:6px"><span class="pfx">$</span><input type="number" data-bind="people.' + i + '.income" value="' + (p.income||0) + '" step="100" placeholder="Gross monthly income"><span class="sfx">/mth</span></div>' +
       '<div class="inp" style="margin-bottom:6px"><span class="pfx">Age</span><input type="number" data-bind="people.' + i + '.age" value="' + (p.age||30) + '" step="1"><span class="sfx">yrs</span></div>' +
       '<div class="inp" style="margin-bottom:6px"><span class="pfx">OA</span><input type="number" data-bind="people.' + i + '.oa" value="' + (p.oa||0) + '" step="1000"><span class="sfx">balance</span></div>' +
+      '<select data-bind="people.' + i + '.citizenship" style="margin-bottom:6px">' +
+        ['SC','PR1','PR2'].map(function(c){
+          return '<option value="' + c + '"' + ((p.citizenship || 'SC') === c ? ' selected' : '') + '>' + BTO.CIT_LABEL[c] + '</option>';
+        }).join('') +
+      '</select>' +
       '<select data-bind="people.' + i + '.basis">' +
         '<option value="employee"' + (p.basis === 'employee' ? ' selected' : '') + '>Employee (CPF on salary)</option>' +
         '<option value="self"' + (p.basis === 'self' ? ' selected' : '') + '>Self-employed (voluntary CPF)</option>' +
-      '</select></div>');
+      '</select>' +
+      '<div class="mini" style="margin-top:5px" id="rate' + i + '"></div></div>');
   }
   h.push('</div></details>');
 
@@ -717,6 +746,14 @@ function buildSidebar(){
       (state.grantMode === 'auto' && state.otherGrant ? ' + ' + fmt(state.otherGrant) + ' other' : '') +
       ' · net price <b>' + fmt(R.totals.net) + '</b>';
   }
+  /* per-person CPF rate line, so the citizenship choice is never invisible */
+  BTO.compute(state).perPerson.forEach(function (pp, i) {
+    var el = document.getElementById('rate' + i);
+    if (!el) return;
+    el.innerHTML = pp.cit === 'SC'
+      ? 'CPF ' + pct(pp.cpfRate, 1) + ' of wages · OA ' + fmt(pp.monthlyOA) + '/mth'
+      : '<span class="gold">' + pp.citLabel + '</span> · CPF ' + pct(pp.cpfRate, 1) + ' of wages · OA ' + fmt(pp.monthlyOA) + '/mth';
+  });
 }
 
 /* ---------- charts ---------- */
@@ -942,7 +979,7 @@ function viewSplit(R){
   var out = [];
   if (R.single){
     out.push('<div class="kpis">');
-    out.push(kpi('Buying alone', '1 person', 'Single Singapore Citizen scheme'));
+    out.push(kpi('Buying alone', '1 person', R.perPerson[0].cit === 'SC' ? 'Single Singapore Citizen scheme' : R.perPerson[0].citLabel));
     out.push(kpi('Cash needed in total', fmt(R.totals.cash), 'across all stages', true));
     out.push(kpi('Monthly instalment', fmt(R.loan.monthly), 'CPF covers ' + fmt(Math.min(R.loan.monthly, R.loan.cpfInflow))));
     out.push(kpi('Save each month', fmt(R.saveup.growth), 'for ' + R.saveup.m4 + ' months'));
@@ -965,6 +1002,16 @@ function viewSplit(R){
   out.push(kpi('Monthly instalment', fmt(R.loan.monthly), 'cash top-up ' + fmt(R.loan.cashTopUp)));
   out.push('</div>');
   out.push(personTable(R));
+  var prs = R.perPerson.filter(function(pp){ return pp.cit !== 'SC'; });
+  if (prs.length){
+    out.push('<div class="msg ' + (prs.length === R.perPerson.length ? 'warn' : '') + '"><b>' +
+      prs.map(function(pp){ return esc(pp.name) + ' — ' + pp.citLabel; }).join(', ') + '.</b> ' +
+      (prs.length === R.perPerson.length
+        ? 'A household of PRs cannot buy a new BTO flat — at least one applicant must be a Singapore Citizen. This plan only makes sense for resale.'
+        : 'A PR pays CPF at graduated rates, so the OA inflow is far smaller than a citizen\u2019s — ' + fmt(prs[0].monthlyOA) + '/month here against ' +
+          fmt(R.perPerson.filter(function(pp){ return pp.cit === 'SC'; })[0].monthlyOA) + ' for the citizen. Expect more of the downpayment to land on cash.') +
+      '</div>');
+  }
   out.push('<div class="card"><h3 class="h">How the two of you can rebalance</h3>' +
     '<div class="msg">Shares are a negotiating position, not a rule. What matters is that each person\u2019s CPF OA can absorb their share at signing — ' +
     'if one side runs out of OA, the shortfall instantly becomes cash. Try “By income” in the sidebar to see the fair split, or set a custom ratio.</div>' +
@@ -981,8 +1028,12 @@ function viewSplit(R){
 function personTable(R){
   var h = ['<div class="card"><h3 class="h">Who pays what</h3><table><tr><th>Person</th><th>Share</th><th>CPF OA used</th><th>Cash</th><th>Monthly share</th><th>Take-home</th></tr>'];
   R.perPerson.forEach(function(p){
-    h.push('<tr><td><b>' + esc(p.name) + '</b><div class="mini">' + fmt(p.oa) + ' OA today · ' + fmt(p.monthlyOA) + '/mth inflow</div></td>' +
-      '<td>' + Math.round(p.ratio*100) + '%</td><td>' + fmt(p.cpf) + '</td><td>' + fmt(p.cash) + '</td>' +
+    h.push('<tr><td><b>' + esc(p.name) + '</b>' + (p.cit !== 'SC' ? ' <span class="badge cash">' + p.citLabel + '</span>' : '') +
+      '<div class="mini">' + fmt(p.oa) + ' OA today · ' + fmt(p.monthlyOA) + '/mth inflow · CPF ' + pct(p.cpfRate,1) + '</div></td>' +
+      '<td>' + Math.round(p.ratio*100) + '%</td>' +
+      '<td>' + fmt(p.cpf) + (p.cpfIn > 0.5 ? '<div class="mini">own ' + fmt(p.cpfOwn) + ' + ' + fmt(p.cpfIn) + ' pooled</div>' : '') +
+        (p.cpfOut > 0.5 ? '<div class="mini">lends ' + fmt(p.cpfOut) + '</div>' : '') + '</td>' +
+      '<td>' + fmt(p.cash) + '</td>' +
       '<td>' + fmt(p.monthlyShare) + '</td><td>' + fmt(p.takeHome) + '</td></tr>');
   });
   h.push('<tr class="tot"><td>Together</td><td>100%</td><td>' + fmt(R.totals.cpf) + '</td><td>' + fmt(R.totals.cash) + '</td><td>' + fmt(R.loan.monthly) + '</td><td>' + fmt(R.takeHome) + '</td></tr>');
@@ -1022,6 +1073,8 @@ function viewSummary(R){
     '<li>Stamp duty ' + fmt(R.totals.bsd) + ' and legal ' + fmt(R.totals.legal) + ' computed on the price before grant.</li>' +
     '<li>CPF OA grows ' + pct(R.s.oaRate,1) + ' a year; savings grow ' + pct(S.saveRate,1) + ' a year; other investments ' + pct(S.goalRate,1) + '.</li>' +
     '<li>Key collection ' + R.s.mKey + ' months out, signing at ' + R.s.mSign + '. HPS ' + fmt(R.s.hps) + ', fire insurance per flat type.</li>' +
+    '<li>CPF at ' + R.perPerson.map(function(pp){ return esc(pp.name) + ' ' + pct(pp.cpfRate,1) + ' (' + (pp.cit === 'SC' ? 'citizen' : pp.citLabel) + ')'; }).join(', ') +
+      ' — from CPF Board\u2019s 2026 contribution tables.</li>' +
     '</ul></div>');
   return out.join('');
 }
@@ -1128,7 +1181,7 @@ document.addEventListener('change', function (e) {
     setPath(state, el.dataset.bind, el.value);
     save();
     var rebuild = ['loanType','grantMode','basis'].indexOf(el.dataset.bind.split('.')[0]) >= 0 ||
-      (el.dataset.bind.indexOf('.basis') >= 0);
+      /\.(basis|citizenship)$/.test(el.dataset.bind);
     if (rebuild) buildSidebar();
     schedule();
   }
