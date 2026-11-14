@@ -467,16 +467,23 @@ function computeCore(s){
   var m4 = Math.max(m3, stages[3].month);
   var rs = (s.saveRate || 0) / 12;
 
-  function requiredMonthly(x3, a3, x4, a4, rr){
+  function requiredParts(x3, a3, x4, a4, rr){
     var f4 = fvFactor(rr, a4);
-    if (!f4) return 0;
     var carried = x3 * Math.pow(1 + rr, Math.max(0, a4 - a3));
-    var main = (x4 + carried) / f4;
-    var early = x3 / fvFactor(rr, Math.max(1, a3));
-    return Math.max(main, early);
+    var main = f4 ? (x4 + carried) / f4 : 0;           /* fund everything by key collection */
+    var early = x3 / fvFactor(rr, Math.max(1, a3));    /* fund the signing lump in time */
+    return { main: main, early: early, value: Math.max(main, early) };
   }
-  var sPlain = requiredMonthly(need3, m3, need4, m4, 0);
-  var sGrowth = requiredMonthly(need3, m3, need4, m4, rs);
+  function requiredMonthly(x3, a3, x4, a4, rr){
+    return requiredParts(x3, a3, x4, a4, rr).value;
+  }
+  var partsPlain = requiredParts(need3, m3, need4, m4, 0);
+  var partsGrowth = requiredParts(need3, m3, need4, m4, rs);
+  var sPlain = partsPlain.value;
+  var sGrowth = partsGrowth.value;
+  /* which deadline drives the monthly figure — the signing lump or the total */
+  var driver = partsGrowth.early >= partsGrowth.main ? 'signing' : 'key';
+  var driverMonthly = driver === 'signing' ? partsGrowth.early : partsGrowth.main;
 
   var capacity = (s.capacityMode === 'manual')
     ? (s.capacityManual || 0)
@@ -505,6 +512,8 @@ function computeCore(s){
     need3: need3, need4: need4, m3: m3, m4: m4,
     plain: sPlain, growth: sGrowth, capacity: capacity, surplus: surplus,
     ahead: ahead, afterSign: afterSign,
+    driver: driver, driverMonthly: driverMonthly,
+    keyOnlyMonthly: partsGrowth.main, signingOnlyMonthly: partsGrowth.early,
     goalFV: goalFV, goalPlain: Math.max(0, surplus) * m4,
     monthsNeeded: monthsNeeded, achievable: achievable,
     saveRate: s.saveRate || 0, goalRate: s.goalRate || 0,
@@ -898,11 +907,36 @@ function interestChart(L){
     lineChart({ series: series, maxX: L.n, h: 210 });
 }
 
+/* the sentence that explains the monthly number — it must name the deadline that
+   actually sets it, otherwise a big lump at signing reads as a mystery figure */
+function saveUpStory(S){
+  var head = 'The flat needs <b>' + fmt(S.immediate) + '</b> almost immediately (application plus option fee), <b>' +
+    fmt(S.need3) + '</b> at signing and <b>' + fmt(S.need4) + '</b> at key collection. ';
+  var small = S.need4 < Math.max(250, 0.15 * S.need3);
+  if (S.driver === 'signing'){
+    if (small){
+      return head + 'The signing stage is the whole job, and it is only ' + S.m3 + ' months away: <b>' +
+        fmt(S.need3) + ' ÷ ' + S.m3 + ' months = ' + fmt(S.signingOnlyMonthly) + ' a month</b>' +
+        (S.afterSign > 0.5 ? ', dropping to <b>' + fmt(S.afterSign) + '</b> after that.' : ', then nothing — the key-collection bill is already covered by the CPF you will have built up.');
+    }
+    return head + 'The signing lump sets the pace: <b>' + fmt(S.need3) + ' ÷ ' + S.m3 + ' months = ' +
+      fmt(S.signingOnlyMonthly) + ' a month</b>, against <b>' + fmt(S.keyOnlyMonthly) +
+      '</b> if you only had to fund the total by key collection. Saving the higher figure is what leaves <b>' +
+      fmt(S.ahead) + '</b> spare by key collection — renovation money, or a reason to drop to <b>' +
+      fmt(S.afterSign) + '</b> a month once the lease is signed.';
+  }
+  return head + 'The total is the pace-setter here: <b>' + fmt(S.need3 + S.need4) + ' ÷ ' + S.m4 +
+    ' months = ' + fmt(S.keyOnlyMonthly) + ' a month</b>, and that also clears the signing lump in time.';
+}
+
 function viewSaveUp(R){
   var S = R.saveup, L = R.loan;
   var out = [];
+  var basis = S.driver === 'signing'
+    ? fmt(S.need3) + ' due at signing ÷ ' + S.m3 + ' months'
+    : fmt(S.need3 + S.need4) + ' total ÷ ' + S.m4 + ' months';
   out.push('<div class="kpis">');
-  out.push(kpi('Save each month — cash', fmt(S.growth), 'for ' + S.m4 + ' months at ' + pct(S.saveRate,1), true));
+  out.push(kpi('Save each month — cash', fmt(S.growth), basis, true));
   out.push(kpi('You can set aside', fmt(S.capacity), R.s.capacityMode === 'manual' ? 'manual figure' : 'take-home less commitments'));
   out.push(kpi(S.surplus >= 0 ? 'Spare for other goals' : 'Shortfall each month', fmt(Math.abs(S.surplus)),
     S.surplus >= 0 ? 'free cash after the house' : 'more needed than you have', S.surplus >= 0));
@@ -912,10 +946,7 @@ function viewSaveUp(R){
   out.push('<div class="card"><h3 class="h">Cash needed vs cash saved</h3>' +
     '<div class="legend"><span><i style="background:var(--gold)"></i>Cash required by each stage</span><span><i style="background:var(--accent)"></i>Your savings at the required rate</span></div>' +
     saveCurve(R) +
-    '<div class="msg">The flat needs <b>' + fmt(S.immediate) + '</b> almost immediately (application plus option fee), then <b>' + fmt(S.need3) +
-    '</b> at signing and <b>' + fmt(S.need4) + '</b> at key collection. Locking in <b>' + fmt(S.growth) + ' a month</b> from now clears both (' + fmt(S.plain) + ' without investing it)' +
-    (S.ahead > 250 ? '. Because the signing payment is the tighter deadline, that rate leaves you about <b>' + fmt(S.ahead) + '</b> ahead by key collection — renovation money, or a reason to drop to <b>' + fmt(S.afterSign) + '</b> a month once the lease is signed.' : '.') +
-    '</div></div>');
+    '<div class="msg">' + saveUpStory(S) + '</div></div>');
 
   out.push('<div class="grid2">');
   out.push('<div class="card"><h3 class="h">What that leaves for other goals</h3>' +

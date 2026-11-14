@@ -25,11 +25,11 @@ Files:
 | File | What it is |
 |---|---|
 | `index.html` | The whole app: engine (marked `BTO ENGINE START/END`), UI, styles |
-| `tests/engine.test.mjs` | 126 assertions run against the engine **extracted from `index.html`** |
+| `tests/engine.test.mjs` | 135 assertions run against the engine **extracted from `index.html`** |
 | `README.md` | This file |
 
 Run the tests with `node tests/engine.test.mjs` (Node 22+). Current status:
-**126 passed, 0 failed**.
+**135 passed, 0 failed**.
 
 ## Sources
 

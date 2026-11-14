@@ -359,5 +359,34 @@ eq('take-home keeps the excess above ceiling', BTO.monthlyTakeHome({ income: 120
   eq('cit: unknown status falls back to citizen', BTO.cpfRates(30, 'XX').cit, 'SC');
 }
 
+/* ---------------- 14. which deadline drives the monthly saving ---------------- */
+{
+  const noOA = [{ name: 'A', income: 6500, age: 30, oa: 0, basis: 'employee', citizenship: 'SC' },
+                { name: 'B', income: 5000, age: 29, oa: 0, basis: 'employee', citizenship: 'SC' }];
+
+  /* bank route: nearly all the cash is due at signing, so that deadline sets the pace */
+  const bank = BTO.compute(base({ loanType: 'bank75', price: 550000, flatType: '4-room', people: noOA, saveRate: 0.001 }));
+  eq('driver: bank loan flags the signing deadline', bank.saveup.driver, 'signing');
+  eq('driver: monthly equals the signing lump over months to signing',
+     bank.saveup.driverMonthly, bank.saveup.need3 / bank.saveup.m3, 10);
+  eq('driver: monthly is the larger of the two deadlines', bank.saveup.driverMonthly >= bank.saveup.keyOnlyMonthly, true);
+  eq('driver: little or nothing is left for key collection', bank.saveup.need4 < 100, true);
+  eq('driver: after signing the rate drops to nothing', bank.saveup.afterSign < 1, true);
+
+  /* signing two years out: the same lumps no longer force a high monthly rate,
+     so the total (key collection) becomes the pace-setter */
+  const spread = BTO.compute(base({ loanType: 'hdb-staggered', price: 550000, flatType: '4-room', people: noOA, mSign: 24, mKey: 36 }));
+  eq('driver: a late signing stage hands the pace to key collection', spread.saveup.driver, 'key');
+  eq('driver: monthly equals the total over months to key',
+     spread.saveup.driverMonthly, (spread.saveup.need3 + spread.saveup.need4) / spread.saveup.m4, 60);
+
+  /* the reported monthly must always equal the deadline it names */
+  [bank, spread].forEach((R, i) => {
+    const S = R.saveup;
+    const want = S.driver === 'signing' ? S.signingOnlyMonthly : S.keyOnlyMonthly;
+    eq(`driver: named driver matches the rate (case ${i})`, Math.round(S.growth), Math.round(want), 1);
+  });
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
