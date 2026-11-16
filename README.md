@@ -20,11 +20,32 @@ link (true of any static host); `Raw/Code/bto-calculator/` in the vault stays th
 source of truth and `~/code/bto-studio/publish.sh` republishes it (`retract`
 takes the link down).
 
-Files:
+## Using it on a phone or tablet
+
+The Pages link is a normal public URL, so any device on any network can open it —
+no install, no account. Two things make it feel like an app:
+
+- **Add to home screen.** iOS Safari: Share → *Add to Home Screen*. Android
+  Chrome: ⋮ → *Install app*. There is a `manifest.webmanifest` plus 180/192/512
+  icons, so it launches standalone with the dark theme colour and its own tile.
+- **Share case** (🔗 in the header) copies a link that carries the *entire* case
+  in the URL fragment (`#c=…`, the inputs only — never sent anywhere). Build the
+  case on the laptop, copy the link, open it on the iPad and the client sees
+  exactly the same numbers. Reset clears the fragment so a reload starts fresh.
+
+Layout below 980 px flips to **results first, form underneath**, inputs go to
+16 px (iOS otherwise zooms the page on focus), and wide payment tables swipe
+sideways with a hint underneath. Verified at 390 / 430 / 768 / 820 px with no
+horizontal overflow.
+
+`localStorage` is per device, so a case does not sync by itself — the share link
+is how a case travels. Files:
 
 | File | What it is |
 |---|---|
 | `index.html` | The whole app: engine (marked `BTO ENGINE START/END`), UI, styles |
+| `manifest.webmanifest` | Home-screen install metadata |
+| `icons/` | 180 / 192 / 512 app icons, maskable variant, and `bto-qr.png` |
 | `tests/engine.test.mjs` | 175 assertions run against the engine **extracted from `index.html`** |
 | `README.md` | This file |
 

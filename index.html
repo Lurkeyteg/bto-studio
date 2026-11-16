@@ -204,6 +204,7 @@ ul.clean b{color:var(--txt)}
   <div class="sp"></div>
   <span class="pill" id="pillMode">Couple</span>
   <span class="pill" id="pillLoan">HDB loan</span>
+  <button class="tbtn" id="shareBtn" title="Copy a link that carries this exact case">🔗 <span>Share case</span></button>
   <button class="tbtn" id="printBtn">⎙ Print</button>
   <button class="tbtn" id="resetBtn">Reset</button>
   <button class="tbtn" id="themeBtn">◐ <span>Theme</span></button>
@@ -705,35 +706,47 @@ function pct(x, d){ return (x*100).toFixed(d === undefined ? 2 : d) + '%'; }
 function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]; }); }
 
 /* ---------- state ---------- */
-function load(){
+/* every saved or shared case goes through the same repairs */
+function sanitise(o){
   var d = BTO.defaultState();
+  for (var k in d) if (!(k in o)) o[k] = d[k];
+  if (!o.people || !o.people.length) o.people = d.people;
+  while (o.people.length < 2) o.people.push({ name:'Partner', income:0, age:30, oa:0, basis:'employee', citizenship:'SC' });
+  o.people.forEach(function (pp) { if (!pp.citizenship) pp.citizenship = 'SC'; });
+  /* migrate the old "staggered" loan option into its own schedule field */
+  if (o.loanType === 'hdb-staggered') { o.loanType = 'hdb'; o.dpSchedule = 'student'; }
+  if (!BTO.PATHS[o.loanType]) o.loanType = 'hdb';
+  if (!BTO.SCHEDULES[o.dpSchedule]) o.dpSchedule = 'adult';
+  /* repair an OA rate that was typed into a field showing a fraction (0.025
+     became 0.00025) — no CPF OA rate is below 0.5% */
+  if (typeof o.oaRate !== 'number' || o.oaRate < 0.005 || o.oaRate > 0.06) o.oaRate = d.oaRate;
+  if (!BTO.VEHICLES[o.vehicle]) o.vehicle = 'custom';
+  Object.keys(BTO.VEH_KEY).forEach(function(k){
+    var v = o[BTO.VEH_KEY[k]];
+    if (typeof v !== 'number' || !isFinite(v) || v < 0 || v > 0.5) o[BTO.VEH_KEY[k]] = BTO.VEHICLES[k].rate;
+  });
+  /* the stored rate always agrees with the vehicle it is meant to represent */
+  if (o.vehicle !== 'custom' && BTO.VEHICLES[o.vehicle]) o.saveRate = BTO.vehRate(o, o.vehicle);
+  /* the timeline defaults moved to HDB's median (42 months booking → keys).
+     Carry an untouched old default forward; a deliberate custom timeline stays. */
+  if (o.mKey === 36 && o.mSign === 8) o.mKey = Math.max(1, o.mBooking || 1) + 42;
+  return o;
+}
+/* a shared link carries a whole case: #c=<base64 of the state> */
+function caseFromLink(){
+  var m = (location.hash || '').match(/[#&]c=([^&]+)/);
+  if (!m) return null;
+  try { return sanitise(JSON.parse(decodeURIComponent(atob(m[1])))); }
+  catch (e) { return null; }
+}
+function load(){
+  var fromLink = caseFromLink();
+  if (fromLink) return fromLink;
   try {
     var raw = localStorage.getItem(KEY);
-    if (!raw) return d;
-    var o = JSON.parse(raw);
-    for (var k in d) if (!(k in o)) o[k] = d[k];
-    if (!o.people || !o.people.length) o.people = d.people;
-    while (o.people.length < 2) o.people.push({ name:'Partner', income:0, age:30, oa:0, basis:'employee', citizenship:'SC' });
-    o.people.forEach(function (pp) { if (!pp.citizenship) pp.citizenship = 'SC'; });
-    /* migrate the old "staggered" loan option into its own schedule field */
-    if (o.loanType === 'hdb-staggered') { o.loanType = 'hdb'; o.dpSchedule = 'student'; }
-    if (!BTO.PATHS[o.loanType]) o.loanType = 'hdb';
-    if (!BTO.SCHEDULES[o.dpSchedule]) o.dpSchedule = 'adult';
-    /* repair an OA rate that was typed into a field showing a fraction (0.025
-       became 0.00025) — no CPF OA rate is below 0.5% */
-    if (typeof o.oaRate !== 'number' || o.oaRate < 0.005 || o.oaRate > 0.06) o.oaRate = d.oaRate;
-    if (!BTO.VEHICLES[o.vehicle]) o.vehicle = 'custom';
-    Object.keys(BTO.VEH_KEY).forEach(function(k){
-      var v = o[BTO.VEH_KEY[k]];
-      if (typeof v !== 'number' || !isFinite(v) || v < 0 || v > 0.5) o[BTO.VEH_KEY[k]] = BTO.VEHICLES[k].rate;
-    });
-    /* the stored rate always agrees with the vehicle it is meant to represent */
-    if (o.vehicle !== 'custom' && BTO.VEHICLES[o.vehicle]) o.saveRate = BTO.vehRate(o, o.vehicle);
-    /* the timeline defaults moved to HDB's median (42 months booking → keys).
-       Carry an untouched old default forward; a deliberate custom timeline stays. */
-    if (o.mKey === 36 && o.mSign === 8) o.mKey = Math.max(1, o.mBooking || 1) + 42;
-    return o;
-  } catch (e) { return d; }
+    if (!raw) return BTO.defaultState();
+    return sanitise(JSON.parse(raw));
+  } catch (e) { return BTO.defaultState(); }
 }
 var state = load();
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
@@ -1444,10 +1457,30 @@ $('#themeBtn').addEventListener('click', function(){
   render();
 });
 $('#printBtn').addEventListener('click', function(){ window.print(); });
+
+/* carry a whole case to another device: the link holds the inputs, not the server */
+$('#shareBtn').addEventListener('click', function(){
+  var payload;
+  try { payload = btoa(encodeURIComponent(JSON.stringify(state))); }
+  catch (e) { payload = ''; }
+  if (!payload) return;
+  var url = location.origin + location.pathname + '#c=' + payload;
+  var done = function(ok){
+    var b = $('#shareBtn'), old = b.innerHTML;
+    b.innerHTML = ok ? '✓ <span>Link copied</span>' : '🔗 <span>Copy failed</span>';
+    setTimeout(function(){ b.innerHTML = old; }, 2200);
+    if (!ok) window.prompt('Copy this link and open it on the other device:', url);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){ done(true); }, function(){ done(false); });
+  } else { done(false); }
+});
 $('#resetBtn').addEventListener('click', function(){
   if (!window.confirm('Reset every input back to the defaults?')) return;
   var tab = state.tab;
   state = BTO.defaultState(); state.tab = tab;
+  /* a shared case lives in the URL — drop it, or a reload would bring it back */
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
   save(); buildSidebar(); render();
 });
 
