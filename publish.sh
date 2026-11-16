@@ -54,6 +54,10 @@ cd "$REPO" || exit 1
 # ---- 1. copy the vault copy in ----
 cp "$SRC/index.html" ./index.html
 cp "$SRC/README.md" ./README.md
+# home-screen install: manifest + icons for iOS/Android
+cp "$SRC/manifest.webmanifest" ./manifest.webmanifest
+mkdir -p icons
+cp "$SRC"/icons/*.png icons/
 mkdir -p tests
 cp "$SRC/tests/engine.test.mjs" tests/
 [ -f .nojekyll ] || : > .nojekyll

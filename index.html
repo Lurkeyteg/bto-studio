@@ -2,12 +2,18 @@
 <html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>BTO Studio — Payment, Loan &amp; Savings Planner</title>
 <meta name="robots" content="noindex,nofollow,noarchive">
 <meta name="description" content="Singapore BTO planner: staged CPF/cash payments, HDB or bank loan repayment split between CPF and cash, save-up plan to key collection, single vs couple splitting.">
 <meta name="theme-color" content="#0e1311">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="BTO Studio">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e1311'/%3E%3Cpath d='M6 15 L16 7 L26 15' fill='none' stroke='%236fbfa5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M9 15 V25 H23 V15' fill='none' stroke='%2395d9c3' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <style>
 :root{
@@ -153,6 +159,33 @@ ul.clean b{color:var(--txt)}
   .tab{font-size:12px;padding:8px 8px 9px}
   .kpi .v{font-size:19px}
   h3.h{font-size:12.5px}
+}
+@media(max-width:980px){
+  /* phones and tablets: the numbers first, the input form underneath */
+  .grid{display:flex;flex-direction:column;align-items:stretch}
+  .grid>main{order:-1}
+  /* 16px stops iOS from zooming the page when a field is focused */
+  input,select,textarea,.inp input,.field input,.inp select{font-size:16px}
+  .tab{padding:11px 12px}
+  .tbtn,.pill{min-height:34px}
+  .side{position:static;max-height:none;overflow:visible}
+}
+@media(max-width:720px){
+  body{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
+  .wrap{padding:0 13px}
+  .top{flex-wrap:wrap;row-gap:7px;padding:10px 13px}
+  .brand{flex:1 1 100%}
+  .brand span{display:none}
+  .sp{display:none}
+  .tbtn{padding:8px 11px;min-height:36px}
+  .hero{padding:16px 0 10px}
+  .hero h1{font-size:22px;letter-spacing:-.6px}
+  .card{padding:13px}
+  .tabs{gap:2px;margin:10px 0 12px}
+  .tab{font-size:12.5px;padding:10px 9px}
+  /* a wide payment table can be swiped rather than clipped */
+  .card:has(table)::after{content:"swipe the table sideways →";display:block;margin-top:8px;
+    font-size:11px;color:var(--muted);letter-spacing:.02em}
 }
 @media print{
   .top,.tabs,.side,.hero p,.foot{display:none!important}

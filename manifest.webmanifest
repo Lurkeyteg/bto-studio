@@ -1,0 +1,16 @@
+{
+  "name": "BTO Studio — Payment, Loan & Savings Planner",
+  "short_name": "BTO Studio",
+  "description": "Singapore BTO planner: staged CPF/cash payments, HDB or bank loan split between CPF and cash, save-up plan to key collection.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e1311",
+  "theme_color": "#0e1311",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
